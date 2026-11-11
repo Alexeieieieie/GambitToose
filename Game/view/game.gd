@@ -3,6 +3,8 @@ extends Node2D
 # The level scene. Runs the simulation at a fixed timestep, turns mouse input into
 # build commands, and plays sounds and effects for simulation events.
 # Nothing here ever addresses a vehicle: the player builds roads and sets rules only.
+#
+# The same scene also runs the tutorial lessons (Levels.mode == "tutorial").
 
 const C = preload("res://sim/constants.gd")
 const Sim = preload("res://sim/sim.gd")
@@ -14,13 +16,23 @@ const FxLayer = preload("res://view/fx_layer.gd")
 const Hud = preload("res://ui/hud.gd")
 const LightPanel = preload("res://ui/light_panel.gd")
 const SorterPanel = preload("res://ui/sorter_panel.gd")
-const TutorialOverlay = preload("res://ui/tutorial_overlay.gd")
+const HelpOverlay = preload("res://ui/help_overlay.gd")
+const ConfirmDialog = preload("res://ui/confirm_dialog.gd")
 const Results = preload("res://ui/results.gd")
+const TutorialData = preload("res://tutorial/tutorial_data.gd")
+const TutorialManager = preload("res://tutorial/tutorial_manager.gd")
+const CoachPanel = preload("res://tutorial/coach_panel.gd")
+const HighlightLayer = preload("res://tutorial/highlight_layer.gd")
 
 const MAP_ORIGIN = Vector2(0, 56)
+const TOOL_ORDER = [C.Tool.ROAD, C.Tool.BRIDGE, C.Tool.LIGHT, C.Tool.SORTER, C.Tool.ERASE]
 
 var sim
 var level = {}
+var lesson = {}                  # the tutorial lesson, when Levels.mode == "tutorial"
+var is_tutorial = false
+var tutorial                     # TutorialManager, or null in normal levels
+var allowed_tools = []           # empty = every tool
 var speed = 0.0                  # 0 (pause), 1, 2, 4
 var last_speed = 1.0
 var acc = 0.0
@@ -29,10 +41,9 @@ var heatmap_on = false
 var modal = false                # a panel or the results screen is open
 var painting = false
 var last_cell = C.NO_CELL
-var crash_seen = false
-var crash_cell = C.NO_CELL
 var ended = false
 var siren_timer = 0.0
+var help_prev_speed = 0.0
 
 var world
 var grid_view
@@ -43,14 +54,24 @@ var fx
 var hud
 var light_panel
 var sorter_panel
-var tutorial
+var help
+var confirm
+var coach
+var highlight
 var results
 
 
 func _ready() -> void:
-	level = Levels.level()
+	is_tutorial = Levels.mode == "tutorial"
+	if is_tutorial:
+		lesson = TutorialData.get_lesson(Levels.tutorial_index)
+		level = lesson["level"]
+		allowed_tools = level.get("allowed_tools", [])
+	else:
+		level = Levels.level()
 	sim = Sim.new()
 	sim.load_level(level)
+	current_tool = _first_allowed_tool()
 
 	world = Node2D.new()
 	world.position = MAP_ORIGIN
@@ -72,10 +93,7 @@ func _ready() -> void:
 	hud.connect("heatmap_pressed", self, "toggle_heatmap")
 	hud.connect("sound_pressed", self, "_on_sound")
 	hud.connect("menu_pressed", self, "go_menu")
-	if level.get("tutorial", false):
-		tutorial = TutorialOverlay.new()
-		ui.add_child(tutorial)
-		tutorial.setup(self)
+	hud.connect("help_pressed", self, "open_help")
 	light_panel = LightPanel.new()
 	ui.add_child(light_panel)
 	light_panel.connect("applied", self, "_on_light_applied")
@@ -84,6 +102,14 @@ func _ready() -> void:
 	ui.add_child(sorter_panel)
 	sorter_panel.connect("applied", self, "_on_sorter_applied")
 	sorter_panel.connect("closed", self, "_on_panel_closed")
+	help = HelpOverlay.new()
+	ui.add_child(help)
+	help.connect("closed", self, "_on_help_closed")
+	if is_tutorial:
+		_setup_tutorial(ui)
+	confirm = ConfirmDialog.new()
+	ui.add_child(confirm)
+	confirm.connect("confirmed", self, "skip_tutorial")
 	results = Results.new()
 	ui.add_child(results)
 	results.connect("restart_pressed", self, "restart")
@@ -92,7 +118,23 @@ func _ready() -> void:
 
 	Sfx.set_speed(1.0)
 	Sfx.reset_streak()
-	hud.toast(Strings.TOAST_PAUSED, 4.0)
+	Sfx.duck(false)
+	if not is_tutorial:
+		hud.toast(Strings.t("TOAST_PAUSED"), 4.0)
+
+
+func _setup_tutorial(ui: CanvasLayer) -> void:
+	light_panel.move_to_right()
+	sorter_panel.move_to_right()
+	tutorial = TutorialManager.new()
+	coach = CoachPanel.new()
+	ui.add_child(coach)
+	coach.setup(self, tutorial)
+	highlight = HighlightLayer.new()
+	ui.add_child(highlight)
+	highlight.setup(tutorial)
+	tutorial.connect("step_changed", self, "_on_tutorial_step")
+	tutorial.start(lesson, sim, Levels.tutorial_index + 1, TutorialData.lesson_count() - 1)
 
 
 func _layer(script) -> Node2D:
@@ -102,10 +144,24 @@ func _layer(script) -> Node2D:
 	return n
 
 
+func _first_allowed_tool() -> int:
+	for t in TOOL_ORDER:
+		if is_tool_allowed(t):
+			return t
+	return C.Tool.ROAD
+
+
+func is_tool_allowed(id: int) -> bool:
+	return allowed_tools.empty() or allowed_tools.has(id)
+
+
 # ---------------------------------------------------------------- main loop
 
 func _process(delta: float) -> void:
 	_update_hover()
+	if tutorial != null:
+		tutorial.tick(delta)
+		_keep_panel_open()
 	if sim.finished or modal:
 		_drain_events()
 		return
@@ -123,6 +179,17 @@ func _process(delta: float) -> void:
 	if siren_timer >= 0.5:
 		siren_timer = 0.0
 		_update_siren()
+
+
+func _keep_panel_open() -> void:
+	# Some tutorial steps explain the controls inside a panel, so the panel stays open.
+	if modal or ended or help.visible:
+		return
+	var need = tutorial.needs_panel()
+	if need == "light" and sim.lights.size() > 0:
+		_open_panel(sim.lights[0])
+	elif need == "sorter" and sim.sorters.size() > 0:
+		_open_panel(sim.sorters[0])
 
 
 func _update_siren() -> void:
@@ -148,24 +215,23 @@ func _drain_events() -> void:
 		elif kind == "jam_start":
 			Sfx.warn()
 			Sfx.reset_streak()
-			hud.toast(Strings.TOAST_JAM, 1.5)
+			hud.toast(Strings.t("TOAST_JAM"), 1.5)
 		elif kind == "light_switch":
 			Sfx.play("tick", 1.0, -10.0)
 		elif kind == "crash":
-			crash_seen = true
-			crash_cell = ev["cell"]
 			Sfx.play("crash")
 			fx.add("crash", [ev["cell"]], 2.5)
-			hud.toast(Strings.TUT_CRASH, 3.0)
-			set_speed(0.0)
+			_apply_speed(0.0)
+			if tutorial != null:
+				tutorial.notify("crash")
 		elif kind == "deadlock_cycle":
 			fx.add("deadlock", ev["cells"], 1.6)
-			hud.toast(Strings.TOAST_DEADLOCK % sim.grid.label(ev["cells"][0]), 2.5)
+			hud.toast(Strings.tf("TOAST_DEADLOCK", [sim.grid.label(ev["cells"][0])]), 2.5)
 		elif kind == "new_building":
 			grid_view.update()
 			Sfx.play("place", 0.7)
 			fx.add("new", ev["cells"], 6.0)
-			hud.toast(Strings.TOAST_NEW_BUILDING, 4.0)
+			hud.toast(Strings.t("TOAST_NEW_BUILDING"), 4.0)
 		elif kind == "finished":
 			_on_finished()
 
@@ -178,23 +244,45 @@ func _on_finished() -> void:
 	painting = false
 	Sfx.set_siren(false)
 	var won = sim.won()
-	Levels.save_result(level["id"], sim.metrics.score(), sim.metrics.stars(won))
-	Sfx.play("win" if won else "lose")
 	if sim.lose_cell != null:
 		fx.add("crash", [sim.lose_cell], 3.0)
+	if tutorial != null:
+		tutorial.notify("level_won" if won else "level_lost")
+	if is_tutorial and level.get("final_test", false) and won:
+		# Passing the final test ends the tutorial.
+		Sfx.play("win")
+		yield(get_tree().create_timer(1.4), "timeout")
+		next_lesson()
+		return
+	if not is_tutorial:
+		SaveData.save_result(level["id"], sim.metrics.score(), sim.metrics.stars(won))
+	Sfx.play("win" if won else "lose")
+	Sfx.duck(true)
 	yield(get_tree().create_timer(0.9), "timeout")
-	results.show_result(sim, Levels.has_next())
+	results.show_result(sim, Levels.has_next() and not is_tutorial)
 
 
 # ---------------------------------------------------------------- controls
 
-func set_speed(value: float) -> void:
+func _apply_speed(value: float) -> void:
+	# Changes the speed without telling the tutorial (used for automatic pauses).
 	if value > 0.0:
 		last_speed = value
 	speed = value
 	Sfx.set_speed(last_speed)
 	if speed == 0.0:
 		Sfx.set_siren(false)
+
+
+func set_speed(value: float) -> void:
+	var was_paused = speed == 0.0
+	if value != speed:
+		Sfx.play("speed", 0.85 + 0.15 * value, -6.0)
+	_apply_speed(value)
+	if tutorial != null:
+		if was_paused and value > 0.0:
+			tutorial.notify("speed_started")
+		tutorial.notify("speed_set", {"value": value})
 
 
 func toggle_pause() -> void:
@@ -205,6 +293,9 @@ func toggle_pause() -> void:
 
 
 func set_tool(id: int) -> void:
+	if not is_tool_allowed(id):
+		Sfx.play("deny", 1.0, -6.0)
+		return
 	current_tool = id
 
 
@@ -212,10 +303,30 @@ func toggle_heatmap() -> void:
 	heatmap_on = not heatmap_on
 	heatmap.visible = heatmap_on
 	heatmap.update()
+	Sfx.play("tick", 0.8, -4.0)
+	if tutorial != null:
+		tutorial.notify("heatmap_toggled", {"on": heatmap_on})
 
 
 func _on_sound() -> void:
 	Sfx.toggle()
+
+
+func open_help() -> void:
+	if help.visible or ended:
+		return
+	help_prev_speed = speed
+	_apply_speed(0.0)
+	modal = true
+	painting = false
+	help.open()
+
+
+func _on_help_closed() -> void:
+	modal = ended or light_panel.visible or sorter_panel.visible
+	if help_prev_speed > 0.0:
+		_apply_speed(help_prev_speed)
+	help_prev_speed = 0.0
 
 
 func go_menu() -> void:
@@ -232,6 +343,30 @@ func next_level() -> void:
 	if Levels.has_next():
 		Levels.current += 1
 	get_tree().reload_current_scene()
+
+
+func next_lesson() -> void:
+	Levels.tutorial_index += 1
+	if Levels.tutorial_index >= TutorialData.lesson_count():
+		get_tree().change_scene("res://tutorial/complete_screen.tscn")
+	else:
+		get_tree().reload_current_scene()
+
+
+func ask_skip_tutorial() -> void:
+	confirm.open()
+
+
+func skip_tutorial() -> void:
+	# Skipping the first-run tutorial counts as done; replaying it from the menu changes nothing.
+	if SaveData.is_first_run():
+		SaveData.finish_tutorial(true)
+	get_tree().change_scene("res://ui/main_menu.tscn")
+
+
+func _on_tutorial_step(step) -> void:
+	if step.get("pause_sim", false):
+		_apply_speed(0.0)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -256,8 +391,18 @@ func _on_key(code: int) -> void:
 	if code == KEY_F3:
 		hud.fps_on = not hud.fps_on
 		return
+	if code == KEY_F1:
+		if help.visible:
+			help.close()
+		else:
+			open_help()
+		return
 	if code == KEY_ESCAPE:
-		if light_panel.visible or sorter_panel.visible:
+		if help.visible:
+			help.close()
+		elif confirm.visible:
+			confirm.visible = false
+		elif light_panel.visible or sorter_panel.visible:
 			light_panel.visible = false
 			sorter_panel.visible = false
 			_on_panel_closed()
@@ -326,6 +471,11 @@ func _drag_to(cell: Vector2) -> void:
 		_use_tool(last_cell + step, false)
 
 
+func _deny(msg: String) -> void:
+	hud.toast(msg)
+	Sfx.play("deny", 1.0, -4.0)
+
+
 func _use_tool(cell: Vector2, is_click: bool) -> void:
 	last_cell = cell
 	if not sim.grid.in_bounds(cell):
@@ -336,17 +486,19 @@ func _use_tool(cell: Vector2, is_click: bool) -> void:
 			_open_panel(ctrl)
 		return
 	var built = false
+	var sound = "place"
 	if current_tool == C.Tool.ROAD:
 		built = sim.build_road(cell)
 		if not built and is_click and sim.inventory["road"] <= 0 and sim.grid.tile(cell) == C.Tile.EMPTY:
-			hud.toast(Strings.TOAST_NO_ITEMS)
+			_deny(Strings.t("TOAST_NO_ITEMS"))
 	elif current_tool == C.Tool.BRIDGE:
+		sound = "bridge"
 		built = sim.build_bridge(cell)
 		if not built and is_click:
 			if sim.grid.tile(cell) != C.Tile.WATER:
-				hud.toast(Strings.TOAST_NEED_WATER)
+				_deny(Strings.t("TOAST_NEED_WATER"))
 			elif sim.inventory["bridge"] <= 0:
-				hud.toast(Strings.TOAST_NO_ITEMS)
+				_deny(Strings.t("TOAST_NO_ITEMS"))
 	elif current_tool == C.Tool.LIGHT or current_tool == C.Tool.SORTER:
 		if not is_click:
 			return
@@ -356,19 +508,26 @@ func _use_tool(cell: Vector2, is_click: bool) -> void:
 			built = true
 			_open_panel(placed)
 		elif sim.inventory[kind] <= 0:
-			hud.toast(Strings.TOAST_NO_ITEMS)
+			_deny(Strings.t("TOAST_NO_ITEMS"))
 		else:
-			hud.toast(Strings.TOAST_NEED_JUNCTION)
+			_deny(Strings.t("TOAST_NEED_JUNCTION"))
 	elif current_tool == C.Tool.ERASE:
 		if sim.erase(cell) != "":
 			Sfx.play("erase")
 			fx.add("erase", [cell], 0.3)
 			grid_view.update()
+			_tell_tutorial_changed()
 		return
 	if built:
-		Sfx.play("place", 1.0 + randf() * 0.15)
+		Sfx.play(sound, 1.0 + randf() * 0.12)
 		fx.add("pop", [cell], 0.3)
 		grid_view.update()
+		_tell_tutorial_changed()
+
+
+func _tell_tutorial_changed() -> void:
+	if tutorial != null:
+		tutorial.notify("changed")
 
 
 func _open_panel(ctrl) -> void:
@@ -383,11 +542,13 @@ func _open_panel(ctrl) -> void:
 
 func _on_light_applied(cell, mode, period, threshold, urgent_first) -> void:
 	sim.configure_light(cell, mode, period, threshold, urgent_first)
+	_tell_tutorial_changed()
 
 
 func _on_sorter_applied(cell, rules) -> void:
 	sim.configure_sorter(cell, rules)
+	_tell_tutorial_changed()
 
 
 func _on_panel_closed() -> void:
-	modal = ended
+	modal = ended or help.visible

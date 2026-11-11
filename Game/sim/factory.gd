@@ -30,6 +30,8 @@ func tick(dt: float, sim) -> void:
 	if sim.grid.occupants[cell].size() > 0:
 		return                   # start tile is busy, try again next step
 	var urgent = urgent_every > 0 and (count + 1) % urgent_every == 0
+	if sim.urgent_next.get(color, false):
+		urgent = true            # tutorial hook: the next truck of this color is urgent
 	var cls = C.CargoColor.URGENT if urgent else color
 	var path = sim.pathing.find_path(cls, cell, color, sim.warehouses)
 	if path.size() < 2:
@@ -39,4 +41,6 @@ func tick(dt: float, sim) -> void:
 	no_route = false
 	count += 1
 	sim.spawn_vehicle(self, path, urgent)
+	if urgent:
+		sim.urgent_next[color] = false
 	timer = interval * sim.rng.randf_range(1.0 - C.SPAWN_JITTER, 1.0 + C.SPAWN_JITTER)

@@ -33,6 +33,9 @@ var time_limit = 0.0
 var goal = 0
 var mode = "goal"
 var finished = false
+var lose_enabled = true          # false in tutorial lessons: nothing can be lost
+var lesson = false               # tutorial lesson: the run never ends by itself
+var urgent_next = {}             # tutorial hook: cargo color -> next truck is urgent
 var result = ""                  # "win", "lose", "finished"
 var lose_reason = ""             # "patience", "gridlock", "time"
 var lose_cell = null
@@ -57,7 +60,10 @@ func load_level(lv: Dictionary) -> void:
 	time_limit = float(lv.get("time", 240))
 	goal = int(lv.get("goal", 0))
 	mode = lv.get("mode", "goal")
-	grid.track_conflicts = lv.get("tutorial", false)
+	lose_enabled = lv.get("lose_enabled", true)
+	lesson = lv.get("lesson", false)
+	grid.track_conflicts = lv.get("force_crash", false)
+	grid.hold_for_crash = grid.track_conflicts
 	var inv = lv.get("inventory", {})
 	for key in ["road", "light", "sorter", "bridge"]:
 		inventory[key] = int(inv.get(key, 0))
@@ -71,6 +77,8 @@ func load_level(lv: Dictionary) -> void:
 		_add_factory(f)
 	for w in lv.get("warehouses", []):
 		_add_warehouse(w)
+	for a in lv.get("prebuilt", []):
+		_apply_prebuilt(a)
 	pending_events = lv.get("spawn_events", []).duplicate()
 	for ev in pending_events:
 		for f in ev.get("factories", []):
@@ -79,6 +87,32 @@ func load_level(lv: Dictionary) -> void:
 			grid.reserved[w["cell"]] = true
 	grid.mark_dirty()
 	pathing.rebuild(grid)
+
+
+func _apply_prebuilt(a: Dictionary) -> void:
+	# Level pieces that exist from the start: not erasable and free of charge.
+	var kind = a["type"]
+	if kind == "road_line":
+		var from = a["from"]
+		var to = a["to"]
+		var d = Vector2(sign(to.x - from.x), sign(to.y - from.y))
+		var cell = from
+		while true:
+			grid.tiles[cell] = C.Tile.ROAD
+			if cell == to:
+				break
+			cell += d
+	elif kind == "road":
+		grid.tiles[a["cell"]] = C.Tile.ROAD
+	elif kind == "light":
+		var l = Intersection.new()
+		l.cell = a["cell"]
+		l.mode = a.get("mode", C.LightMode.TIMER)
+		l.period = a.get("period", C.DEFAULT_PERIOD)
+		l.threshold = a.get("threshold", C.DEFAULT_THRESHOLD)
+		grid.controllers[l.cell] = l
+		lights.append(l)
+	grid.mark_dirty()
 
 
 func _add_factory(d: Dictionary) -> void:
@@ -244,6 +278,10 @@ func apply_action(a: Dictionary) -> bool:
 		if place_sorter(a["cell"]) == null:
 			return false
 		return configure_sorter(a["cell"], a.get("rules", {}))
+	if kind == "configure_light":
+		return configure_light(a["cell"], a.get("mode", C.LightMode.SENSOR),
+				a.get("period", C.DEFAULT_PERIOD), a.get("threshold", C.DEFAULT_THRESHOLD),
+				a.get("urgent_first", false))
 	if kind == "erase":
 		return erase(a["cell"]) != ""
 	return false
@@ -306,10 +344,12 @@ func deliver(v) -> void:
 	v.done = true
 	metrics.deliveries += 1
 	metrics.total_delivery_time += time - v.spawn_time
+	if v.urgent:
+		metrics.urgent_deliveries += 1
 	for w in warehouses:
 		if w.cell == v.cell:
 			w.deliver()
-	events.append({"type": "deliver", "cell": v.cell, "color": v.color, "jam": jam_active})
+	events.append({"type": "deliver", "cell": v.cell, "color": v.color, "jam": jam_active, "urgent": v.urgent})
 
 
 func _drop_vehicle(v) -> void:
@@ -468,6 +508,10 @@ func _tick_warehouses(dt: float) -> void:
 		if not color_active(w.color):
 			continue
 		w.drain(dt)
+		if not lose_enabled:
+			if w.patience <= 1.0:
+				w.patience = C.WAREHOUSE_PATIENCE_MAX   # tutorial: the bar clamps and refills
+			continue
 		if w.patience <= 0.0 and not finished:
 			_finish("lose", "patience", w.cell)
 
@@ -497,7 +541,7 @@ func _tick_gridlock(dt: float) -> void:
 		still_time = 0.0
 		return
 	still_time += dt
-	if still_time >= C.GRIDLOCK_SECONDS and not finished:
+	if still_time >= C.GRIDLOCK_SECONDS and not finished and lose_enabled:
 		_finish("lose", "gridlock", null)
 
 
@@ -554,11 +598,11 @@ func _check_deadlock() -> void:
 
 
 func _check_end() -> void:
-	if finished:
+	if finished or lesson:
 		return
 	if mode == "goal" and metrics.deliveries >= goal:
 		_finish("win", "", null)
-	elif time >= time_limit:
+	elif time_limit > 0.0 and time >= time_limit:
 		if mode == "score":
 			_finish("finished", "", null)
 		else:

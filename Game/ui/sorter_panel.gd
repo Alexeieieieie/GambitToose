@@ -37,14 +37,19 @@ func _ready() -> void:
 	card.connect("draw", self, "_draw_rows")
 	title = ThemeBuilder.label("", Rect2(24, 14, 532, 40), 24, true)
 	card.add_child(title)
-	card.add_child(ThemeBuilder.label(Strings.SORTER_HELP, Rect2(24, 52, 532, 24), 14, false, Palette.TEXT_DIM))
-	var cancel = ThemeBuilder.button(Strings.CANCEL, Rect2(24, 348, 250, 52), 18)
+	card.add_child(ThemeBuilder.label(Strings.t("SORTER_HELP"), Rect2(24, 52, 532, 24), 14, false, Palette.TEXT_DIM))
+	var cancel = ThemeBuilder.button(Strings.t("CANCEL"), Rect2(24, 348, 250, 52), 18)
 	cancel.connect("pressed", self, "_on_cancel")
 	card.add_child(cancel)
-	var apply = ThemeBuilder.button(Strings.APPLY, Rect2(306, 348, 250, 52), 18)
+	var apply = ThemeBuilder.button(Strings.t("APPLY"), Rect2(306, 348, 250, 52), 18)
 	ThemeBuilder.paint(apply, Palette.YELLOW, Palette.NAVY)
 	apply.connect("pressed", self, "_on_apply")
 	card.add_child(apply)
+	UiRegistry.register("sorter_apply", apply)
+
+
+func move_to_right() -> void:
+	card.rect_position = Vector2(SCREEN.x - CARD.size.x - 10.0, CARD.position.y)
 
 
 func open(sorter, valid_dirs: Array, cell_label: String) -> void:
@@ -53,16 +58,16 @@ func open(sorter, valid_dirs: Array, cell_label: String) -> void:
 	chosen = {}
 	for color in sorter.rules.keys():
 		chosen[color] = sorter.rules[color]
-	title.text = Strings.SORTER_TITLE % cell_label
+	title.text = Strings.tf("SORTER_TITLE", [cell_label])
 	for item in row_btns:
 		item[2].queue_free()
 	row_btns = []
-	var rows = [[C.CargoColor.BLUE, Strings.CARGO_BLUE], [C.CargoColor.RED, Strings.CARGO_RED],
-			[C.CargoColor.URGENT, Strings.CARGO_URGENT]]
+	var rows = [[C.CargoColor.BLUE, Strings.t("CARGO_BLUE")], [C.CargoColor.RED, Strings.t("CARGO_RED")],
+			[C.CargoColor.URGENT, Strings.t("CARGO_URGENT")]]
 	var y = 92.0
 	for row in rows:
 		var x = 170.0
-		var any = ThemeBuilder.button(Strings.ANY_DIR, Rect2(x, y, 110, 56), 14)
+		var any = ThemeBuilder.button(Strings.t("ANY_DIR"), Rect2(x, y, 110, 56), 14)
 		any.connect("pressed", self, "_on_pick", [row[0], Vector2()])
 		card.add_child(any)
 		row_btns.append([row[0], Vector2(), any])
@@ -83,8 +88,8 @@ func open(sorter, valid_dirs: Array, cell_label: String) -> void:
 
 func _draw_rows() -> void:
 	# Row captions with a truck in the cargo color (and a ring for urgent cargo).
-	var rows = [[C.CargoColor.BLUE, Strings.CARGO_BLUE], [C.CargoColor.RED, Strings.CARGO_RED],
-			[C.CargoColor.URGENT, Strings.CARGO_URGENT]]
+	var rows = [[C.CargoColor.BLUE, Strings.t("CARGO_BLUE")], [C.CargoColor.RED, Strings.t("CARGO_RED")],
+			[C.CargoColor.URGENT, Strings.t("CARGO_URGENT")]]
 	var y = 92.0
 	for row in rows:
 		var at = Vector2(42, y + 28)

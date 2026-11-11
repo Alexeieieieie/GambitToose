@@ -4,14 +4,13 @@ extends Node
 
 const C = preload("res://sim/constants.gd")
 
-const SAVE_PATH = "user://save.cfg"
-
 var current = 0                  # index into LEVELS
-var best = {}                    # level id -> {"score": int, "stars": int}
+var mode = "level"               # "level" or "tutorial"
+var tutorial_index = 0           # lesson 0..5, and 6 is the final test
 
 var LEVELS = [
 	{
-		"id": 1, "name": "Первые дороги", "time": 90, "goal": 14, "mode": "goal", "seed": 1337,
+		"id": 1, "name_key": "LEVEL_1", "time": 90, "goal": 14, "mode": "goal", "seed": 1337,
 		"factories": [
 			{"cell": Vector2(2, 7), "color": C.CargoColor.BLUE, "interval": 4.0, "start_at": 0.0},
 			{"cell": Vector2(15, 1), "color": C.CargoColor.RED, "interval": 5.0, "start_at": 12.0},
@@ -23,14 +22,13 @@ var LEVELS = [
 		"water": [], "obstacles": [],
 		"roads": _line(Vector2(15, 2), Vector2(15, 12)),
 		"inventory": {"road": 80, "light": 1, "sorter": 0, "bridge": 0},
-		"tutorial": true,
 		"solution": [
 			{"type": "road_line", "from": Vector2(3, 7), "to": Vector2(28, 7)},
 			{"type": "light", "cell": Vector2(15, 7), "mode": C.LightMode.SENSOR},
 		]
 	},
 	{
-		"id": 2, "name": "Две переправы", "time": 240, "goal": 70, "mode": "goal", "seed": 2024,
+		"id": 2, "name_key": "LEVEL_2", "time": 240, "goal": 70, "mode": "goal", "seed": 2024,
 		"factories": [
 			{"cell": Vector2(2, 4), "color": C.CargoColor.BLUE, "interval": 5.0, "start_at": 0.0, "urgent_every": 6},
 			{"cell": Vector2(2, 10), "color": C.CargoColor.RED, "interval": 5.0, "start_at": 0.0},
@@ -44,7 +42,6 @@ var LEVELS = [
 				Vector2(5, 13), Vector2(15, 12), Vector2(16, 12), Vector2(26, 13)],
 		"roads": [],
 		"inventory": {"road": 70, "light": 2, "sorter": 2, "bridge": 2},
-		"tutorial": false,
 		"solution": [
 			{"type": "road_line", "from": Vector2(3, 4), "to": Vector2(10, 4)},
 			{"type": "road_line", "from": Vector2(10, 5), "to": Vector2(10, 6)},
@@ -64,7 +61,7 @@ var LEVELS = [
 		]
 	},
 	{
-		"id": 3, "name": "Большой город", "time": 240, "goal": 0, "mode": "score", "seed": 777,
+		"id": 3, "name_key": "LEVEL_3", "time": 240, "goal": 0, "mode": "score", "seed": 777,
 		"factories": [
 			{"cell": Vector2(2, 3), "color": C.CargoColor.BLUE, "interval": 5.0, "start_at": 0.0},
 		],
@@ -88,7 +85,6 @@ var LEVELS = [
 				Vector2(5, 13), Vector2(6, 13), Vector2(10, 1), Vector2(11, 1), Vector2(27, 7)],
 		"roads": [],
 		"inventory": {"road": 140, "light": 4, "sorter": 3, "bridge": 0},
-		"tutorial": false,
 		"solution": [
 			{"type": "road_line", "from": Vector2(3, 3), "to": Vector2(28, 3)},
 			{"type": "road_line", "from": Vector2(3, 11), "to": Vector2(28, 11)},
@@ -143,45 +139,9 @@ static func _river(narrow_columns: Array) -> Array:
 	return out
 
 
-func _ready() -> void:
-	load_save()
-
-
 func level() -> Dictionary:
 	return LEVELS[current]
 
 
 func has_next() -> bool:
 	return current + 1 < LEVELS.size()
-
-
-func load_save() -> void:
-	var cfg = ConfigFile.new()
-	if cfg.load(SAVE_PATH) != OK:
-		return
-	for lv in LEVELS:
-		var key = str(lv["id"])
-		best[lv["id"]] = {
-			"score": int(cfg.get_value("score", key, 0)),
-			"stars": int(cfg.get_value("stars", key, 0)),
-			"played": bool(cfg.get_value("played", key, false)),
-		}
-
-
-func get_best(id: int) -> Dictionary:
-	return best.get(id, {"score": 0, "stars": 0, "played": false})
-
-
-func save_result(id: int, score: int, stars: int) -> void:
-	var b = get_best(id)
-	if not b["played"] or score > b["score"]:
-		b["score"] = score
-	b["stars"] = int(max(b["stars"], stars))
-	b["played"] = true
-	best[id] = b
-	var cfg = ConfigFile.new()
-	for key in best.keys():
-		cfg.set_value("score", str(key), best[key]["score"])
-		cfg.set_value("stars", str(key), best[key]["stars"])
-		cfg.set_value("played", str(key), best[key]["played"])
-	cfg.save(SAVE_PATH)

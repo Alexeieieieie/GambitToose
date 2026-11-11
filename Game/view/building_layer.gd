@@ -58,7 +58,7 @@ func _draw_warning(p: Vector2) -> void:
 	p.y += bob
 	draw_colored_polygon(PoolVector2Array([p + Vector2(0, -11), p + Vector2(11, 8), p + Vector2(-11, 8)]), Palette.NAVY)
 	draw_colored_polygon(PoolVector2Array([p + Vector2(0, -7), p + Vector2(7, 6), p + Vector2(-7, 6)]), Palette.YELLOW)
-	DrawUtil.centered(self, Fonts.make(12, true), p + Vector2(0, 1), Strings.NO_ROUTE, Palette.NAVY)
+	DrawUtil.centered(self, Fonts.make(12, true), p + Vector2(0, 1), Strings.t("NO_ROUTE"), Palette.NAVY)
 
 
 func _draw_warehouse(w) -> void:

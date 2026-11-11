@@ -61,13 +61,14 @@ static func button(caption: String, rect: Rect2, font_size: int = 16) -> Button:
 static func label(caption: String, rect: Rect2, font_size: int = 16, bold: bool = false,
 		color: Color = Color(1, 1, 1), centered: bool = false) -> Label:
 	var l = Label.new()
-	l.text = caption
-	l.rect_position = rect.position
-	l.rect_size = rect.size
+	l.autowrap = true            # before the text, or the label first sizes itself to one long line
 	l.add_font_override("font", Fonts.make(font_size, bold))
 	l.add_color_override("font_color", color)
 	l.valign = Label.VALIGN_CENTER
-	l.autowrap = true
+	l.text = caption
+	l.rect_min_size = Vector2(rect.size.x, 0)
+	l.rect_position = rect.position
+	l.rect_size = rect.size
 	if centered:
 		l.align = Label.ALIGN_CENTER
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE

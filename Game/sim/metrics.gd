@@ -1,6 +1,7 @@
 extends Reference
 
 var deliveries = 0
+var urgent_deliveries = 0
 var total_delivery_time = 0.0
 var jam_seconds = 0.0
 var jam_cells = {}               # Vector2 -> seconds a jammed vehicle stood there

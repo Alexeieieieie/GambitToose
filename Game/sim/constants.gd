@@ -30,6 +30,7 @@ const JAM_WAIT = 3.0              # a vehicle waiting longer than this is "in a 
 const DEADLOCK_CHECK_INTERVAL = 0.5
 const SPAWN_JITTER = 0.1          # +-10 percent on factory intervals
 const NO_ROUTE_RETRY = 0.5
+const CRASH_HOLD_MAX = 8.0        # tutorial lesson 2: how long the first truck waits for cross traffic
 const LANE_OFFSET = 6.5           # pixels from the tile center to the lane center
 const DIRS = [Vector2(1, 0), Vector2(-1, 0), Vector2(0, 1), Vector2(0, -1)]
 const NO_CELL = Vector2(-99, -99)

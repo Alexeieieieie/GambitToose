@@ -3,7 +3,12 @@ extends Node
 # Sound effects pool and music. Everything is a local generated .wav file.
 
 const POOL_SIZE = 6
-const NAMES = ["deliver", "place", "erase", "tick", "warn", "crash", "win", "lose", "click"]
+const NAMES = ["deliver", "place", "bridge", "erase", "tick", "warn", "crash", "win", "lose", "click",
+		"step", "lesson", "fanfare", "deny", "speed"]
+# Semitone offsets of a major pentatonic ladder: deliveries in a row climb it.
+const LADDER = [0, 2, 4, 7, 9, 12, 14, 16]
+const MUSIC_DB = -9.0
+const MUSIC_DUCKED_DB = -18.0
 
 var enabled = true
 var _streams = {}
@@ -30,7 +35,7 @@ func _ready() -> void:
 		_pool.append(p)
 	_music = AudioStreamPlayer.new()
 	_music.bus = "Music"
-	_music.volume_db = -8.0
+	_music.volume_db = MUSIC_DB
 	_music.stream = _load_stream("music", true)
 	add_child(_music)
 	_siren = AudioStreamPlayer.new()
@@ -38,6 +43,7 @@ func _ready() -> void:
 	_siren.volume_db = -14.0
 	_siren.stream = _load_stream("siren", true)
 	add_child(_siren)
+	set_enabled(SaveData.sound_on, false)
 	if _music.stream != null:
 		_music.play()
 
@@ -75,12 +81,12 @@ func play(n: String, pitch: float = 1.0, volume_db: float = 0.0) -> void:
 
 
 func delivery_sound(during_jam: bool) -> void:
-	# The ding climbs while deliveries arrive without a jam.
+	# The ding climbs a musical scale while deliveries arrive without a jam.
 	if during_jam:
 		_deliver_streak = 0
 	else:
-		_deliver_streak = int(min(_deliver_streak + 1, 12))
-	play("deliver", 1.0 + 0.04 * _deliver_streak, -4.0)
+		_deliver_streak = int(min(_deliver_streak + 1, LADDER.size() - 1))
+	play("deliver", pow(2.0, LADDER[_deliver_streak] / 12.0), -4.0)
 
 
 func reset_streak() -> void:
@@ -106,6 +112,12 @@ func set_speed(speed: float) -> void:
 		_music.pitch_scale = 1.0
 
 
+func duck(on: bool) -> void:
+	# Lowers the music under the results fanfare.
+	if _music != null:
+		_music.volume_db = MUSIC_DUCKED_DB if on else MUSIC_DB
+
+
 func set_siren(on: bool) -> void:
 	if _siren == null or _siren.stream == null:
 		return
@@ -115,8 +127,10 @@ func set_siren(on: bool) -> void:
 		_siren.stop()
 
 
-func set_enabled(on: bool) -> void:
+func set_enabled(on: bool, remember: bool = true) -> void:
 	enabled = on
+	if remember:
+		SaveData.set_sound(on)
 	for bus_name in ["Music", "SFX"]:
 		var i = AudioServer.get_bus_index(bus_name)
 		if i != -1:

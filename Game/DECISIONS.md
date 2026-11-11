@@ -49,3 +49,40 @@ did not work as written, and what was done instead.
   next to the level data, as in the brief's own example.
 - `tests/smoke.tscn` is an extra end-to-end run (real scenes, mouse and keyboard input,
   screenshots). It is not one of the 11 required tests.
+
+## English and tutorial update (promts/eng_tutorial.md)
+
+### Localization
+- **Existing key names were kept** (for example `LIGHT_TITLE`, `THRESHOLD`, `LEVEL_N`) instead of renaming them to
+  the names in the brief's table, because the brief says to map to the keys that exist. The English texts follow the table.
+- **`HINT_PATIENCE` has no location now**, as in the brief's English text. The Russian text was changed to match.
+- **Level names** moved out of `autoload/levels.gd` into the string tables (`name_key`).
+- **The title is `GridFlow` in both languages** (the old Russian title was a different name).
+- **Autoload order** is `SaveData, Strings, Palette, Fonts, Levels, Sfx, UiRegistry`. `SaveData` reaches `Strings` and `Sfx`
+  by node path because autoloads that read it cannot also be referenced from it (parse cycle).
+
+### Tutorial
+- **Lesson 2, step 3 waits for the crash, not for the 1x press.** The explanation in step 4 is only true once the
+  trucks have met, so the manager shows it then. Pressing 1x is still highlighted.
+- **The scripted crash is guaranteed.** In lesson 2 only, the first truck to reach the uncontrolled crossing waits
+  (at most 8 s) until a truck from the other road is also there. Everything else about junctions is unchanged.
+- **Lesson levels never end by themselves** (`lesson: true`), have no time limit and cannot be lost: patience bars refill
+  and gridlock does not end the run. The top bar shows `--:--` and a delivery count instead of a timer.
+- **Lessons 3 and 4 keep a panel open** (`needs_panel`) while they explain it; closing it with Cancel reopens it.
+  In the tutorial the light and sorter panels sit on the right so the coach card on the left never covers them.
+- **Lesson 4 layout:** a vertical 2-tile river, two prebuilt crossings approaches, a fork at (8, 7). Each crossing ends
+  next to a warehouse of both colors, so any split of the colors works. The rule check also requires that both
+  factories still have a route, so pointing a color back the way it came does not count.
+- **Lesson 5:** the first two trucks are urgent (a hook arms the first one, the factory makes every second truck urgent).
+  A dead-end stub makes the crossing a junction so a light can go there.
+- **Lesson 6** has a prebuilt Timer light (8 s) and fast factories so jams form.
+- **Final test:** 90 s, goal 6, losing enabled; a second step explains what to do after the Start button.
+- **Reset lesson** is offered when the network stands still for 8 s, and `R` always restarts the lesson.
+- **Progress dots** show the steps of the current lesson; the tag shows the lesson number.
+- The Help overlay pauses with a silent speed change, so closing it never counts as pressing a speed button.
+
+### Sound
+- Sounds were rebuilt (marimba and bell tones, filtered noise, reverb). Short effects are 44.1 kHz, long ones and
+  the 30 s music loop 22.05 kHz; the total is about 1.9 MB. New sounds: bridge, step, lesson, fanfare, deny, speed.
+- Delivery dings climb a major pentatonic ladder instead of a linear pitch ramp. The music is ducked under the results.
+- I cannot listen to audio here. The files were checked numerically (no clipping, no DC offset, seamless loop ends).

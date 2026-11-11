@@ -16,7 +16,9 @@ const CARD = Rect2(330, 100, 620, 520)
 var cell = Vector2()
 var chosen_mode = C.LightMode.TIMER
 var chosen_urgent = false
+var card
 var title
+var sub_label
 var mode_btns = {}
 var mode_notes = {}
 var threshold_label
@@ -38,23 +40,26 @@ func _ready() -> void:
 	dim.rect_size = SCREEN
 	dim.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(dim)
-	var card = Panel.new()
+	card = Panel.new()
 	card.rect_position = CARD.position
 	card.rect_size = CARD.size
 	card.add_stylebox_override("panel", ThemeBuilder.box(Palette.NAVY_MID, 18, 3, Palette.NAVY_LIGHT))
 	add_child(card)
-	title = ThemeBuilder.label("", Rect2(24, 14, 572, 40), 24, true)
+	title = ThemeBuilder.label("", Rect2(24, 8, 572, 36), 24, true)
 	card.add_child(title)
+	sub_label = ThemeBuilder.label(Strings.t("LIGHT_PANEL_SUB"), Rect2(24, 40, 572, 22), 14, false, Palette.TEXT_DIM)
+	card.add_child(sub_label)
 
-	var modes = [[C.LightMode.TIMER, Strings.MODE_TIMER, Strings.MODE_TIMER_DESC],
-			[C.LightMode.SENSOR, Strings.MODE_SENSOR, Strings.MODE_SENSOR_DESC],
-			[C.LightMode.PRIORITY, Strings.MODE_PRIORITY, Strings.MODE_PRIORITY_DESC]]
+	var modes = [[C.LightMode.TIMER, Strings.t("MODE_TIMER"), Strings.t("MODE_TIMER_DESC"), "light_mode_timer"],
+			[C.LightMode.SENSOR, Strings.t("MODE_SENSOR"), Strings.t("MODE_SENSOR_DESC"), "light_mode_sensor"],
+			[C.LightMode.PRIORITY, Strings.t("MODE_PRIORITY"), Strings.t("MODE_PRIORITY_DESC"), "light_mode_priority"]]
 	var x = 24.0
 	for m in modes:
 		var b = ThemeBuilder.button(m[1], Rect2(x, 66, 182, 52), 18)
 		b.connect("pressed", self, "_on_mode", [m[0]])
 		card.add_child(b)
 		mode_btns[m[0]] = b
+		UiRegistry.register(m[3], b)
 		var note = ThemeBuilder.label(m[2], Rect2(x, 120, 182, 40), 12, false, Palette.TEXT_DIM, true)
 		card.add_child(note)
 		mode_notes[m[0]] = note
@@ -75,7 +80,7 @@ func _ready() -> void:
 	urgent_btn.connect("pressed", self, "_on_urgent")
 	card.add_child(urgent_btn)
 
-	var preview_title = ThemeBuilder.label(Strings.PREVIEW, Rect2(350, 172, 246, 22), 12, true, Palette.TEXT_DIM, true)
+	var preview_title = ThemeBuilder.label(Strings.t("PREVIEW"), Rect2(350, 172, 246, 22), 12, true, Palette.TEXT_DIM, true)
 	card.add_child(preview_title)
 	preview = Control.new()
 	preview.rect_position = Vector2(350, 196)
@@ -84,13 +89,14 @@ func _ready() -> void:
 	preview.connect("draw", self, "_draw_preview")
 	card.add_child(preview)
 
-	var cancel = ThemeBuilder.button(Strings.CANCEL, Rect2(24, 448, 270, 52), 18)
+	var cancel = ThemeBuilder.button(Strings.t("CANCEL"), Rect2(24, 448, 270, 52), 18)
 	cancel.connect("pressed", self, "_on_cancel")
 	card.add_child(cancel)
-	var apply = ThemeBuilder.button(Strings.APPLY, Rect2(326, 448, 270, 52), 18)
+	var apply = ThemeBuilder.button(Strings.t("APPLY"), Rect2(326, 448, 270, 52), 18)
 	ThemeBuilder.paint(apply, Palette.YELLOW, Palette.NAVY)
 	apply.connect("pressed", self, "_on_apply")
 	card.add_child(apply)
+	UiRegistry.register("light_apply", apply)
 
 
 func _slider(r: Rect2, lo: float, hi: float) -> HSlider:
@@ -104,13 +110,18 @@ func _slider(r: Rect2, lo: float, hi: float) -> HSlider:
 	return s
 
 
+func move_to_right() -> void:
+	# In the tutorial the coach card sits on the left, so the panel moves right.
+	card.rect_position = Vector2(SCREEN.x - CARD.size.x - 10.0, CARD.position.y)
+
+
 func open(light, cell_label: String) -> void:
 	cell = light.cell
 	chosen_mode = light.mode
 	chosen_urgent = light.urgent_first
 	threshold_slider.value = light.threshold
 	period_slider.value = light.period
-	title.text = Strings.LIGHT_TITLE % cell_label
+	title.text = Strings.tf("LIGHT_TITLE", [cell_label])
 	demo = Intersection.new()
 	_sync()
 	visible = true
@@ -120,8 +131,8 @@ func _sync() -> void:
 	for m in mode_btns.keys():
 		var on = m == chosen_mode
 		ThemeBuilder.paint(mode_btns[m], Palette.NAVY_LIGHT if on else Palette.NAVY, Palette.WHITE, on)
-	threshold_label.text = Strings.THRESHOLD % int(threshold_slider.value)
-	period_label.text = Strings.PERIOD % int(period_slider.value)
+	threshold_label.text = Strings.tf("THRESHOLD", [int(threshold_slider.value)])
+	period_label.text = Strings.tf("PERIOD", [int(period_slider.value)])
 	var timer_mode = chosen_mode == C.LightMode.TIMER
 	threshold_slider.editable = not timer_mode
 	period_slider.editable = timer_mode
@@ -130,7 +141,7 @@ func _sync() -> void:
 	period_label.modulate.a = 1.0 if timer_mode else 0.4
 	period_slider.modulate.a = 1.0 if timer_mode else 0.4
 	var urgent_on = chosen_urgent or chosen_mode == C.LightMode.PRIORITY
-	urgent_btn.text = Strings.TOGGLE % [Strings.URGENT_FIRST, Strings.ON if urgent_on else Strings.OFF]
+	urgent_btn.text = Strings.tf("TOGGLE", [Strings.t("URGENT_FIRST"), Strings.t("ON") if urgent_on else Strings.t("OFF")])
 	ThemeBuilder.paint(urgent_btn, Palette.NAVY_LIGHT if urgent_on else Palette.NAVY, Palette.WHITE, urgent_on)
 	urgent_btn.disabled = chosen_mode == C.LightMode.PRIORITY
 	if demo != null:

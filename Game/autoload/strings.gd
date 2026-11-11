@@ -1,108 +1,431 @@
 extends Node
 
-# Every string the player can see. Nothing outside this file contains UI text.
+# Every string the player can see lives in this file, in two languages.
+# Use Strings.t("KEY") for plain text and Strings.tf("KEY", [args]) for formatted text.
+# English is the default. Russian is an optional second language.
 
-const TITLE = "АвтоТрафик"
-const SUBTITLE = "Строй дороги, настраивай правила. Машины едут сами."
-const PLAY = "Играть"
-const LEVELS = "Уровни"
-const SOUND_ON = "Звук: вкл"
-const SOUND_OFF = "Звук: выкл"
-const EXIT = "Выход"
-const BACK = "Назад"
-const MENU = "Меню"
-const PAUSE = "Пауза"
-const SPEED_1 = "1x"
-const SPEED_2 = "2x"
-const SPEED_4 = "4x"
-const HEATMAP = "Тепловая карта"
-const HEATMAP_ON = "Включена"
-const FREE = "Свободно"
-const BUSY = "Загружено"
-const JAM = "Затор"
-const DELIVERED = "Доставлено"
-const LEVEL = "Уровень"
-const LEVEL_N = "Уровень %d"
-const ROAD = "Дорога"
-const LIGHT = "Светофор"
-const SORTER = "Фильтр"
-const BRIDGE = "Мост"
-const ERASE = "Стереть"
-const COUNT = "%s ×%d"
-const MODE_TIMER = "Таймер"
-const MODE_SENSOR = "Датчик"
-const MODE_PRIORITY = "Приоритет"
-const MODE_TIMER_DESC = "Меняет сигнал по времени"
-const MODE_SENSOR_DESC = "Считает очередь машин"
-const MODE_PRIORITY_DESC = "Датчик и срочные первыми"
-const URGENT_FIRST = "Срочные грузовики без очереди"
-const ON = "вкл"
-const OFF = "выкл"
-const TOGGLE = "%s: %s"
-const APPLY = "Применить"
-const CANCEL = "Отмена"
-const RESTART = "Заново"
-const NEXT_LEVEL = "Следующий уровень"
-const WIN_TITLE = "Уровень пройден!"
-const FINISH_TITLE = "Смена окончена!"
-const LOSE_PATIENCE = "Склад не дождался груза"
-const LOSE_GRIDLOCK = "Система остановилась"
-const LOSE_TIME = "Время вышло"
-const AVG_DELIVERY = "Средняя доставка"
-const TIME_IN_JAMS = "Время в заторах"
-const SCORE = "Счёт: %d"
-const BEST = "Рекорд: %d"
-const NOT_PLAYED = "Ещё не пройден"
-const SECONDS = "%.1f с"
-const PROGRESS = "%d / %d"
-const PROGRESS_SCORE = "%d"
-const GOAL = "Цель: %d доставок"
-const GOAL_SCORE = "Цель: максимум очков"
-const DURATION = "Время: %d:%02d"
-const TIMER = "%d:%02d"
-const FPS = "Кадров в секунду: %d"
+const EN = {
+	"TITLE": "GridFlow",
+	"SUBTITLE": "Build the system. Let it run itself.",
+	"PLAY": "Play",
+	"LEVELS": "Levels",
+	"TUTORIAL": "Tutorial",
+	"SOUND_ON": "Sound: on",
+	"SOUND_OFF": "Sound: off",
+	"LANGUAGE_BTN": "Language: English",
+	"EXIT": "Quit",
+	"BACK": "Back",
+	"MENU": "Menu",
+	"PAUSE": "Pause",
+	"SPEED_1": "1x",
+	"SPEED_2": "2x",
+	"SPEED_4": "4x",
+	"HEATMAP": "Heatmap",
+	"HEATMAP_ON": "On",
+	"FREE": "Clear",
+	"BUSY": "Busy",
+	"JAM": "Jam",
+	"JAM_STRIPED": "Jam (striped)",
+	"DELIVERED": "Delivered",
+	"DELIVERED_N": "Delivered: %d",
+	"LEVEL": "Level",
+	"LEVEL_N": "Level %d",
+	"ROAD": "Road",
+	"LIGHT": "Light",
+	"SORTER": "Sorter",
+	"BRIDGE": "Bridge",
+	"ERASE": "Erase",
+	"COUNT": "%s ×%d",
+	"MODE_TIMER": "Timer",
+	"MODE_SENSOR": "Sensor",
+	"MODE_PRIORITY": "Priority",
+	"MODE_TIMER_DESC": "Switches sides on a timer",
+	"MODE_SENSOR_DESC": "Serves the longer queue",
+	"MODE_PRIORITY_DESC": "Sensor, urgent trucks first",
+	"URGENT_FIRST": "Urgent trucks go first",
+	"ON": "on",
+	"OFF": "off",
+	"TOGGLE": "%s: %s",
+	"APPLY": "Apply",
+	"CANCEL": "Cancel",
+	"RESTART": "Retry",
+	"NEXT_LEVEL": "Next level",
+	"WIN_TITLE": "Level complete!",
+	"FINISH_TITLE": "Shift complete!",
+	"LOSE_PATIENCE": "A warehouse ran out of patience",
+	"LOSE_GRIDLOCK": "Total gridlock",
+	"LOSE_TIME": "Time's up",
+	"AVG_DELIVERY": "Avg. delivery time",
+	"TIME_IN_JAMS": "Time in jams",
+	"SCORE": "Score: %d",
+	"BEST": "Best: %d",
+	"NOT_PLAYED": "Not played yet",
+	"SECONDS": "%.1f s",
+	"PROGRESS": "%d / %d",
+	"PROGRESS_SCORE": "%d",
+	"GOAL": "Goal: %d deliveries",
+	"GOAL_SCORE": "Goal: highest score",
+	"DURATION": "Time: %d:%02d",
+	"TIMER": "%d:%02d",
+	"FPS": "FPS: %d",
+	"LIGHT_TITLE": "Traffic light, junction %s",
+	"LIGHT_PANEL_SUB": "Choose how this light decides who goes",
+	"SORTER_TITLE": "Sorter, junction %s",
+	"THRESHOLD": "Switch when more than %d trucks wait",
+	"PERIOD": "Switch every %d s",
+	"PREVIEW": "How it works",
+	"CARGO_BLUE": "Blue",
+	"CARGO_RED": "Red",
+	"CARGO_URGENT": "Urgent",
+	"SORTER_HELP": "Where each cargo turns",
+	"ANY_DIR": "Any",
+	"TOAST_NEW_BUILDING": "New building! Connect it to a road",
+	"TOAST_NEED_JUNCTION": "Only works on a junction",
+	"TOAST_NO_ITEMS": "None left in stock",
+	"TOAST_NEED_WATER": "Bridges go on water only",
+	"TOAST_DEADLOCK": "Deadlock near %s",
+	"TOAST_JAM": "Jam!",
+	"TOAST_PAUSED": "Paused. Build roads, then press Play",
+	"NO_ROUTE": "!",
+	"HINT_CLEAN": "Great network: almost no jams.",
+	"HINT_LIGHT": "The longest jam was at %s. Put a Sensor light there.",
+	"HINT_SENSOR": "The longest jam was at %s. Try a Sensor light on the busiest road.",
+	"HINT_BRIDGE": "Trucks queued at the river near %s. A second bridge would split the traffic.",
+	"HINT_SORTER": "Different colors shared one road near %s. A Sorter can separate them.",
+	"HINT_PATIENCE": "A warehouse ran dry. Make sure every color has a route to its warehouse.",
+	"HINT_GRIDLOCK": "Trucks locked each other in at %s. Add a bypass or a Sensor light.",
+	"HINT_TIME": "Not enough deliveries. Shorten the route and speed up with 4x.",
+	"HINT_NO_JAM_LOSS": "Check that every warehouse has a road from a factory of the same color.",
+	"LEVEL_1": "First Roads",
+	"LEVEL_2": "River Crossing",
+	"LEVEL_3": "Rush Hour",
+	"HELP": "Help",
+	"HELP_BTN": "?",
+	"CLOSE": "Close",
+	"NO_LIMIT": "--:--",
+	"WELCOME_TITLE": "Welcome to GridFlow",
+	"WELCOME_BODY": "You are a traffic automation engineer. You never drive a truck. You build a system of roads, lights and sorters, and it runs itself. The tutorial takes about 5 minutes.",
+	"START_TUTORIAL": "Start tutorial",
+	"SKIP_TUTORIAL": "Skip tutorial",
+	"SKIP_CONFIRM": "Skip the tutorial? You can replay it anytime from the main menu.",
+	"SKIP": "Skip",
+	"GO_BACK": "Go back",
+	"COMPLETE_TITLE": "Tutorial complete!",
+	"COMPLETE_BODY": "You now know everything you need. Roads connect, lights and sorters decide, and the heatmap shows what is failing. Good luck, engineer!",
+	"PLAY_LEVEL_1": "Play Level 1",
+	"MAIN_MENU": "Main menu",
+	"TUT_LESSON_TAG": "Lesson %d of %d",
+	"TUT_FINAL_TAG": "Final test",
+	"TUT_CONTINUE": "Continue",
+	"TUT_START": "Start",
+	"TUT_HINT": "Hint",
+	"TUT_SKIP_STEP": "Skip step",
+	"TUT_RESET": "Reset lesson",
+	"TUT_LESSON_DONE": "Lesson complete!",
+	"TUT_LESSON_DONE_BODY": "Nice work. Ready for the next one?",
+	"TUT_NEXT_LESSON": "Next lesson",
+	"TUT_LOCKED": "Unlocked later in the tutorial",
+	"TUT_CK_UP": "Upper crossing",
+	"TUT_CK_DOWN": "Lower crossing",
+	"TUT_L1_TITLE": "Your first road",
+	"TUT_L1_S1": "Welcome, engineer! You never drive trucks in GridFlow. You build the system, and the system runs itself.",
+	"TUT_L1_S2": "Factories make trucks. Each truck only delivers to a warehouse of its own color: blue to blue, red to red.",
+	"TUT_L1_S3": "Pick the Road tool, then drag from the factory to the warehouse to connect them.",
+	"TUT_L1_S3_HINT": "Click and drag along the row between the two buildings.",
+	"TUT_L1_S4": "Press 1x to start. The trucks find their own way. You can't steer them, and that is the point.",
+	"TUT_L1_S4_HINT": "Press the yellow 1x button in the top bar.",
+	"TUT_L1_S5": "Every warehouse has a patience bar. It drains over time and refills with each delivery. If it runs out, you lose. Deliver 3 trucks.",
+	"TUT_L1_S5_HINT": "Just wait: the trucks drive themselves. Press 4x to go faster.",
+	"TUT_L2_TITLE": "Junctions and jams",
+	"TUT_L2_S1": "Now a red line has to cross your blue road. Red trucks go to the red warehouse.",
+	"TUT_L2_S2": "Drag a road from the red factory down to the red warehouse, crossing the blue road.",
+	"TUT_L2_S2_HINT": "Start next to the red factory and drag straight down to the red warehouse.",
+	"TUT_L2_S3": "Press 1x and watch what happens at the crossing.",
+	"TUT_L2_S3_HINT": "Press the 1x button in the top bar and wait a few seconds.",
+	"TUT_L2_S4": "Trucks from both roads reached the crossing at the same moment. With no signal, they block each other.",
+	"TUT_L2_S5": "One stuck truck makes every truck behind it wait, so a jam spreads backwards down the street. Next, let's fix it.",
+	"TUT_L3_TITLE": "Smart traffic lights",
+	"TUT_L3_S1": "Pick the Light tool and click the crossing.",
+	"TUT_L3_S1_HINT": "Click the tile where the two roads cross.",
+	"TUT_L3_S2": "Timer: the green light switches sides every few seconds. Simple, but wasteful when one road is busier.",
+	"TUT_L3_S3": "Sensor: green goes to the side with the longer queue. Great when traffic is uneven.",
+	"TUT_L3_S4": "Priority: urgent trucks (yellow, with a ring) always go first.",
+	"TUT_L3_S5": "Choose Sensor and press Apply. The slider sets how long a queue must get before the light switches.",
+	"TUT_L3_S5_HINT": "Click the Sensor card, then press Apply.",
+	"TUT_L3_S6": "Press 1x and watch the queue clear. Deliver 6 trucks.",
+	"TUT_L3_S6_HINT": "Press 1x, or 4x if you are impatient.",
+	"TUT_L4_TITLE": "Bridges and sorters",
+	"TUT_L4_S1": "Rivers block roads. Only bridges can cross water. See how both roads stop at the river?",
+	"TUT_L4_S2": "Pick the Bridge tool and click the water tiles to link each road across.",
+	"TUT_L4_S2_HINT": "Each crossing needs two bridge tiles, one for each water tile.",
+	"TUT_L4_S3": "Blue and red trucks share one road, then split. A Sorter sends each color its own way.",
+	"TUT_L4_S4": "Pick the Sorter tool and click the fork.",
+	"TUT_L4_S4_HINT": "Click the tile where the road splits in two.",
+	"TUT_L4_S5": "For each color, choose a direction. Send blue one way and red the other, then press Apply.",
+	"TUT_L4_S5_HINT": "One color up, the other color down, then Apply.",
+	"TUT_L4_S6": "Press 1x and deliver 6 trucks.",
+	"TUT_L4_S6_HINT": "Press 1x, or 4x to go faster.",
+	"TUT_L5_TITLE": "Urgent trucks",
+	"TUT_L5_S1": "Yellow trucks with a ring are urgent. They re-plan their route every second, so they can use a bypass when the main road is jammed.",
+	"TUT_L5_S2": "Place a Light on the junction and set it to Priority, so urgent trucks go first.",
+	"TUT_L5_S2_HINT": "Pick Light, click the junction, choose the Priority card, then Apply.",
+	"TUT_L5_S3": "Press 1x and watch the urgent trucks get through.",
+	"TUT_L5_S3_HINT": "Press 1x, or 4x to go faster.",
+	"TUT_L5_S4": "Tip: build a second road to the same warehouse, and urgent trucks will use it whenever the first one is jammed.",
+	"TUT_L6_TITLE": "Speed, heatmap and score",
+	"TUT_L6_S1": "Pause lets you build in peace. 2x and 4x stress-test your system. Press 4x.",
+	"TUT_L6_S1_HINT": "Press the 4x button in the top bar.",
+	"TUT_L6_S2": "Open the Heatmap. Green is clear, yellow is busy, and red with stripes is a jam.",
+	"TUT_L6_S2_HINT": "Press the orange Heatmap button, or the H key.",
+	"TUT_L6_S3": "The red road shows where your automation is failing. Switch the heatmap off when you are done.",
+	"TUT_L6_S3_HINT": "Press the Heatmap button again.",
+	"TUT_L6_S4": "This light uses a slow timer. Click it and switch it to Sensor.",
+	"TUT_L6_S4_HINT": "Click the light on the crossing, pick Sensor, then Apply.",
+	"TUT_L6_S5": "Every level ends with a score and up to 3 stars. More deliveries and less time stuck in jams means a higher score.",
+	"TUT_FINAL_TITLE": "Final test",
+	"TUT_FINAL_S1": "Final test! Build a network from scratch. Deliver 6 trucks in 90 seconds without a total gridlock.",
+	"TUT_FINAL_S2": "Connect both factories to their warehouses. Cross the river with your bridges, then press 1x.",
+	"TUT_FINAL_S2_HINT": "Blue goes to the blue warehouse, red to the red one. Use a Light and a Sorter where roads meet.",
+	"HELP_TITLE": "Quick reference",
+	"HELP_H_GOAL": "Goal",
+	"HELP_GOAL": "Deliver trucks to the warehouse of the same color before time runs out. If a warehouse runs out of patience, or the whole network freezes, you lose.",
+	"HELP_H_TOOLS": "Tools",
+	"HELP_TOOLS": "Road connects things. Bridge crosses water. Light controls a junction. Sorter sends each color a different way at a fork. Erase removes what you built.",
+	"HELP_H_LIGHTS": "Lights",
+	"HELP_LIGHTS": "Timer switches every few seconds. Sensor serves the longer queue. Priority lets urgent trucks go first.",
+	"HELP_H_URGENT": "Urgent trucks",
+	"HELP_URGENT": "Yellow trucks with a ring re-plan their route and use bypass roads.",
+	"HELP_H_HEATMAP": "Heatmap",
+	"HELP_HEATMAP": "Green is clear, yellow is busy, red with stripes is a jam.",
+	"HELP_H_CONTROLS": "Controls",
+	"HELP_CONTROLS": "Space: pause. 1, 2, 3: speed 1x, 2x, 4x. H: heatmap. R: retry. Esc: menu. F1: help.",
+	"HELP_FOOT": "You never drive the trucks. Build the system and let it run.",
+}
 
-const LIGHT_TITLE = "Светофор, перекрёсток %s"
-const SORTER_TITLE = "Фильтр, перекрёсток %s"
-const THRESHOLD = "Порог очереди: %d"
-const PERIOD = "Период: %d с"
-const PREVIEW = "Как это работает"
-const CARGO_BLUE = "Синие"
-const CARGO_RED = "Красные"
-const CARGO_URGENT = "Срочные"
-const SORTER_HELP = "Куда поворачивает каждый груз"
-const ANY_DIR = "Любое"
+const RU = {
+	"TITLE": "GridFlow",
+	"SUBTITLE": "Построй систему. Пусть она работает сама.",
+	"PLAY": "Играть",
+	"LEVELS": "Уровни",
+	"TUTORIAL": "Обучение",
+	"SOUND_ON": "Звук: вкл",
+	"SOUND_OFF": "Звук: выкл",
+	"LANGUAGE_BTN": "Язык: Русский",
+	"EXIT": "Выход",
+	"BACK": "Назад",
+	"MENU": "Меню",
+	"PAUSE": "Пауза",
+	"SPEED_1": "1x",
+	"SPEED_2": "2x",
+	"SPEED_4": "4x",
+	"HEATMAP": "Тепловая карта",
+	"HEATMAP_ON": "Включена",
+	"FREE": "Свободно",
+	"BUSY": "Загружено",
+	"JAM": "Затор",
+	"JAM_STRIPED": "Затор (полосы)",
+	"DELIVERED": "Доставлено",
+	"DELIVERED_N": "Доставлено: %d",
+	"LEVEL": "Уровень",
+	"LEVEL_N": "Уровень %d",
+	"ROAD": "Дорога",
+	"LIGHT": "Светофор",
+	"SORTER": "Фильтр",
+	"BRIDGE": "Мост",
+	"ERASE": "Стереть",
+	"COUNT": "%s ×%d",
+	"MODE_TIMER": "Таймер",
+	"MODE_SENSOR": "Датчик",
+	"MODE_PRIORITY": "Приоритет",
+	"MODE_TIMER_DESC": "Меняет сигнал по времени",
+	"MODE_SENSOR_DESC": "Считает очередь машин",
+	"MODE_PRIORITY_DESC": "Датчик и срочные первыми",
+	"URGENT_FIRST": "Срочные грузовики без очереди",
+	"ON": "вкл",
+	"OFF": "выкл",
+	"TOGGLE": "%s: %s",
+	"APPLY": "Применить",
+	"CANCEL": "Отмена",
+	"RESTART": "Заново",
+	"NEXT_LEVEL": "Следующий уровень",
+	"WIN_TITLE": "Уровень пройден!",
+	"FINISH_TITLE": "Смена окончена!",
+	"LOSE_PATIENCE": "Склад не дождался груза",
+	"LOSE_GRIDLOCK": "Система остановилась",
+	"LOSE_TIME": "Время вышло",
+	"AVG_DELIVERY": "Средняя доставка",
+	"TIME_IN_JAMS": "Время в заторах",
+	"SCORE": "Счёт: %d",
+	"BEST": "Рекорд: %d",
+	"NOT_PLAYED": "Ещё не пройден",
+	"SECONDS": "%.1f с",
+	"PROGRESS": "%d / %d",
+	"PROGRESS_SCORE": "%d",
+	"GOAL": "Цель: %d доставок",
+	"GOAL_SCORE": "Цель: максимум очков",
+	"DURATION": "Время: %d:%02d",
+	"TIMER": "%d:%02d",
+	"FPS": "Кадров в секунду: %d",
+	"LIGHT_TITLE": "Светофор, перекрёсток %s",
+	"LIGHT_PANEL_SUB": "Выбери, как светофор решает, кто едет",
+	"SORTER_TITLE": "Фильтр, перекрёсток %s",
+	"THRESHOLD": "Переключать, когда ждут больше %d грузовиков",
+	"PERIOD": "Переключать каждые %d с",
+	"PREVIEW": "Как это работает",
+	"CARGO_BLUE": "Синие",
+	"CARGO_RED": "Красные",
+	"CARGO_URGENT": "Срочные",
+	"SORTER_HELP": "Куда поворачивает каждый груз",
+	"ANY_DIR": "Любое",
+	"TOAST_NEW_BUILDING": "Новое здание! Подключи его к дороге",
+	"TOAST_NEED_JUNCTION": "Ставится только на перекрёсток",
+	"TOAST_NO_ITEMS": "Больше нет в запасе",
+	"TOAST_NEED_WATER": "Мост ставится только на воду",
+	"TOAST_DEADLOCK": "Взаимная блокировка у %s",
+	"TOAST_JAM": "Затор!",
+	"TOAST_PAUSED": "Пауза. Строй дороги и нажми «Играть»",
+	"NO_ROUTE": "!",
+	"HINT_CLEAN": "Отличная сеть: заторов почти не было.",
+	"HINT_LIGHT": "Самый долгий затор был у %s. Поставь там светофор в режиме «Датчик».",
+	"HINT_SENSOR": "Самый долгий затор был у %s. Переключи светофор рядом в режим «Датчик».",
+	"HINT_BRIDGE": "Самый долгий затор был у %s, возле переправы. Построй второй мост.",
+	"HINT_SORTER": "Самый долгий затор был у %s. Поставь фильтр и разведи цвета по разным дорогам.",
+	"HINT_PATIENCE": "Склад остался без груза. Проверь, что у каждого цвета есть дорога к своему складу.",
+	"HINT_GRIDLOCK": "Машины заперли друг друга у %s. Добавь объезд или светофор с датчиком.",
+	"HINT_TIME": "Доставок не хватило. Сократи маршрут и ускорь время кнопкой 4x.",
+	"HINT_NO_JAM_LOSS": "Проверь, что к каждому складу ведёт дорога от фабрики того же цвета.",
+	"LEVEL_1": "Первые дороги",
+	"LEVEL_2": "Две переправы",
+	"LEVEL_3": "Большой город",
+	"HELP": "Помощь",
+	"HELP_BTN": "?",
+	"CLOSE": "Закрыть",
+	"NO_LIMIT": "--:--",
+	"WELCOME_TITLE": "Добро пожаловать в GridFlow",
+	"WELCOME_BODY": "Ты инженер по автоматизации движения. Ты никогда не ведёшь грузовик. Ты строишь систему из дорог, светофоров и фильтров, и она работает сама. Обучение занимает около 5 минут.",
+	"START_TUTORIAL": "Начать обучение",
+	"SKIP_TUTORIAL": "Пропустить обучение",
+	"SKIP_CONFIRM": "Пропустить обучение? Его можно пройти снова из главного меню.",
+	"SKIP": "Пропустить",
+	"GO_BACK": "Назад",
+	"COMPLETE_TITLE": "Обучение пройдено!",
+	"COMPLETE_BODY": "Теперь ты знаешь всё необходимое. Дороги соединяют, светофоры и фильтры решают, а тепловая карта показывает, что не работает. Удачи, инженер!",
+	"PLAY_LEVEL_1": "Играть: уровень 1",
+	"MAIN_MENU": "Главное меню",
+	"TUT_LESSON_TAG": "Урок %d из %d",
+	"TUT_FINAL_TAG": "Финальный тест",
+	"TUT_CONTINUE": "Дальше",
+	"TUT_START": "Начать",
+	"TUT_HINT": "Подсказка",
+	"TUT_SKIP_STEP": "Пропустить шаг",
+	"TUT_RESET": "Сбросить урок",
+	"TUT_LESSON_DONE": "Урок пройден!",
+	"TUT_LESSON_DONE_BODY": "Отлично! Переходим к следующему?",
+	"TUT_NEXT_LESSON": "Следующий урок",
+	"TUT_LOCKED": "Откроется позже в обучении",
+	"TUT_CK_UP": "Верхняя переправа",
+	"TUT_CK_DOWN": "Нижняя переправа",
+	"TUT_L1_TITLE": "Твоя первая дорога",
+	"TUT_L1_S1": "Добро пожаловать, инженер! В GridFlow ты не водишь грузовики. Ты строишь систему, и она работает сама.",
+	"TUT_L1_S2": "Фабрики производят грузовики. Каждый грузовик едет только на склад своего цвета: синий к синему, красный к красному.",
+	"TUT_L1_S3": "Выбери инструмент «Дорога» и протяни дорогу от фабрики к складу.",
+	"TUT_L1_S3_HINT": "Зажми кнопку мыши и веди вдоль ряда между двумя зданиями.",
+	"TUT_L1_S4": "Нажми 1x, чтобы начать. Грузовики сами найдут путь. Ты не можешь ими управлять, и в этом смысл.",
+	"TUT_L1_S4_HINT": "Нажми жёлтую кнопку 1x в верхней панели.",
+	"TUT_L1_S5": "У каждого склада есть шкала терпения. Она убывает со временем и пополняется с каждой доставкой. Если она кончится, ты проиграешь. Доставь 3 грузовика.",
+	"TUT_L1_S5_HINT": "Просто подожди: грузовики едут сами. Нажми 4x, чтобы ускорить.",
+	"TUT_L2_TITLE": "Перекрёстки и заторы",
+	"TUT_L2_S1": "Теперь красная линия должна пересечь твою синюю дорогу. Красные грузовики едут на красный склад.",
+	"TUT_L2_S2": "Протяни дорогу от красной фабрики вниз к красному складу, через синюю дорогу.",
+	"TUT_L2_S2_HINT": "Начни у красной фабрики и тяни дорогу прямо вниз до красного склада.",
+	"TUT_L2_S3": "Нажми 1x и посмотри, что произойдёт на перекрёстке.",
+	"TUT_L2_S3_HINT": "Нажми кнопку 1x в верхней панели и подожди несколько секунд.",
+	"TUT_L2_S4": "Грузовики с обеих дорог одновременно подъехали к перекрёстку. Без сигнала они мешают друг другу.",
+	"TUT_L2_S5": "Один застрявший грузовик заставляет ждать все грузовики позади, и затор растёт назад по улице. Давай это исправим.",
+	"TUT_L3_TITLE": "Умные светофоры",
+	"TUT_L3_S1": "Выбери инструмент «Светофор» и нажми на перекрёсток.",
+	"TUT_L3_S1_HINT": "Нажми на клетку, где дороги пересекаются.",
+	"TUT_L3_S2": "Таймер: зелёный меняет сторону каждые несколько секунд. Просто, но расточительно, если одна дорога загружена сильнее.",
+	"TUT_L3_S3": "Датчик: зелёный получает сторона с более длинной очередью. Отлично, когда движение неравномерное.",
+	"TUT_L3_S4": "Приоритет: срочные грузовики (жёлтые, с кольцом) всегда едут первыми.",
+	"TUT_L3_S5": "Выбери «Датчик» и нажми «Применить». Ползунок задаёт, насколько длинной должна быть очередь, чтобы светофор переключился.",
+	"TUT_L3_S5_HINT": "Нажми карточку «Датчик», затем «Применить».",
+	"TUT_L3_S6": "Нажми 1x и смотри, как очередь рассасывается. Доставь 6 грузовиков.",
+	"TUT_L3_S6_HINT": "Нажми 1x, или 4x, если не терпится.",
+	"TUT_L4_TITLE": "Мосты и фильтры",
+	"TUT_L4_S1": "Реки блокируют дороги. Через воду проходят только мосты. Видишь, обе дороги обрываются у реки?",
+	"TUT_L4_S2": "Выбери инструмент «Мост» и нажми на клетки воды, чтобы соединить каждую дорогу с другим берегом.",
+	"TUT_L4_S2_HINT": "Каждой переправе нужно две клетки моста: по одной на каждую клетку воды.",
+	"TUT_L4_S3": "Синие и красные грузовики едут по одной дороге, а потом расходятся. Фильтр отправляет каждый цвет своим путём.",
+	"TUT_L4_S4": "Выбери инструмент «Фильтр» и нажми на развилку.",
+	"TUT_L4_S4_HINT": "Нажми на клетку, где дорога делится на две.",
+	"TUT_L4_S5": "Для каждого цвета выбери направление. Отправь синих в одну сторону, а красных в другую, и нажми «Применить».",
+	"TUT_L4_S5_HINT": "Один цвет вверх, другой вниз, затем «Применить».",
+	"TUT_L4_S6": "Нажми 1x и доставь 6 грузовиков.",
+	"TUT_L4_S6_HINT": "Нажми 1x, или 4x, чтобы быстрее.",
+	"TUT_L5_TITLE": "Срочные грузовики",
+	"TUT_L5_S1": "Жёлтые грузовики с кольцом срочные. Они каждую секунду перестраивают маршрут, поэтому могут объехать затор по обходной дороге.",
+	"TUT_L5_S2": "Поставь светофор на перекрёсток и выбери режим «Приоритет», чтобы срочные грузовики ехали первыми.",
+	"TUT_L5_S2_HINT": "Выбери «Светофор», нажми на перекрёсток, затем карточку «Приоритет» и «Применить».",
+	"TUT_L5_S3": "Нажми 1x и смотри, как срочные грузовики проезжают.",
+	"TUT_L5_S3_HINT": "Нажми 1x, или 4x, чтобы быстрее.",
+	"TUT_L5_S4": "Совет: построй вторую дорогу к тому же складу, и срочные грузовики будут использовать её, когда первая забита.",
+	"TUT_L6_TITLE": "Скорость, тепловая карта и счёт",
+	"TUT_L6_S1": "Пауза позволяет спокойно строить. 2x и 4x проверяют систему на прочность. Нажми 4x.",
+	"TUT_L6_S1_HINT": "Нажми кнопку 4x в верхней панели.",
+	"TUT_L6_S2": "Открой тепловую карту. Зелёный свободно, жёлтый загружено, красный с полосами затор.",
+	"TUT_L6_S2_HINT": "Нажми оранжевую кнопку тепловой карты или клавишу H.",
+	"TUT_L6_S3": "Красная дорога показывает, где твоя автоматика не справляется. Выключи тепловую карту, когда закончишь.",
+	"TUT_L6_S3_HINT": "Нажми кнопку тепловой карты ещё раз.",
+	"TUT_L6_S4": "У этого светофора медленный таймер. Нажми на него и переключи на «Датчик».",
+	"TUT_L6_S4_HINT": "Нажми на светофор на перекрёстке, выбери «Датчик», затем «Применить».",
+	"TUT_L6_S5": "Каждый уровень заканчивается счётом и 1–3 звёздами. Чем больше доставок и меньше времени в заторах, тем выше счёт.",
+	"TUT_FINAL_TITLE": "Финальный тест",
+	"TUT_FINAL_S1": "Финальный тест! Построй сеть с нуля. Доставь 6 грузовиков за 90 секунд без полной пробки.",
+	"TUT_FINAL_S2": "Соедини обе фабрики с их складами. Перейди реку по мосту и нажми 1x.",
+	"TUT_FINAL_S2_HINT": "Синие едут на синий склад, красные на красный. Поставь светофор и фильтр там, где дороги сходятся.",
+	"HELP_TITLE": "Краткая справка",
+	"HELP_H_GOAL": "Цель",
+	"HELP_GOAL": "Доставляй грузовики на склад того же цвета до конца времени. Если у склада кончилось терпение или вся сеть встала, ты проиграешь.",
+	"HELP_H_TOOLS": "Инструменты",
+	"HELP_TOOLS": "Дорога соединяет. Мост пересекает воду. Светофор управляет перекрёстком. Фильтр отправляет каждый цвет своим путём на развилке. Стереть убирает построенное.",
+	"HELP_H_LIGHTS": "Светофоры",
+	"HELP_LIGHTS": "Таймер переключается каждые несколько секунд. Датчик обслуживает более длинную очередь. Приоритет пропускает срочные грузовики первыми.",
+	"HELP_H_URGENT": "Срочные грузовики",
+	"HELP_URGENT": "Жёлтые грузовики с кольцом перестраивают маршрут и используют обходные дороги.",
+	"HELP_H_HEATMAP": "Тепловая карта",
+	"HELP_HEATMAP": "Зелёный свободно, жёлтый загружено, красный с полосами затор.",
+	"HELP_H_CONTROLS": "Управление",
+	"HELP_CONTROLS": "Пробел: пауза. 1, 2, 3: скорость 1x, 2x, 4x. H: тепловая карта. R: заново. Esc: меню. F1: помощь.",
+	"HELP_FOOT": "Ты никогда не управляешь грузовиками. Построй систему и дай ей работать.",
+}
 
-const TUT_ROAD = "Проложи дорогу от фабрики к складу"
-const TUT_PLAY = "Нажми «Играть», и машины поедут сами"
-const TUT_WATCH = "Смотри: скоро поедут красные грузовики"
-const TUT_LIGHT = "Поставь умный светофор на перекрёсток"
-const TUT_SENSOR = "Выбери режим «Датчик» и нажми «Применить»"
-const TUT_DONE = "Отлично! Нажми «Играть» и ускорь время"
-const TUT_CRASH = "Авария на перекрёстке!"
-
-const TOAST_NEW_BUILDING = "Новое здание! Подключи его к дороге"
-const TOAST_NEED_JUNCTION = "Ставится только на перекрёсток"
-const TOAST_NO_ITEMS = "Больше нет в запасе"
-const TOAST_NEED_WATER = "Мост ставится только на воду"
-const TOAST_DEADLOCK = "Взаимная блокировка у %s"
-const TOAST_JAM = "Затор!"
-const TOAST_PAUSED = "Пауза. Строй дороги и нажми «Играть»"
-const NO_ROUTE = "!"
-
-const HINT_CLEAN = "Отличная сеть: заторов почти не было."
-const HINT_LIGHT = "Самый долгий затор был у %s. Поставь там светофор в режиме «Датчик»."
-const HINT_SENSOR = "Самый долгий затор был у %s. Переключи светофор рядом в режим «Датчик»."
-const HINT_BRIDGE = "Самый долгий затор был у %s, возле переправы. Построй второй мост."
-const HINT_SORTER = "Самый долгий затор был у %s. Поставь фильтр и разведи цвета по разным дорогам."
-const HINT_PATIENCE = "Склад %s остался без груза. Проверь дорогу к нему и убери затор по пути."
-const HINT_GRIDLOCK = "Машины заперли друг друга у %s. Добавь объезд или светофор с датчиком."
-const HINT_TIME = "Доставок не хватило. Сократи маршрут и ускорь время кнопкой 4x."
-const HINT_NO_JAM_LOSS = "Проверь, что к каждому складу ведёт дорога от фабрики того же цвета."
+var lang = "en"
 
 
 func _ready() -> void:
-	OS.set_window_title(TITLE)
+	lang = SaveData.language
+	_update_window_title()
 
 
-const KEYS_HELP = "Пробел: пауза   1 2 3: скорость   H: карта   R: заново"
+func t(key):
+	var table = EN if lang == "en" else RU
+	if table.has(key):
+		return table[key]
+	if EN.has(key):
+		return EN[key]
+	return "!" + str(key) + "!"      # visible marker for a missing key
+
+
+func tf(key, args):
+	return t(key) % args             # args is always an Array
+
+
+func set_lang(code) -> void:
+	lang = code if code in ["en", "ru"] else "en"
+	SaveData.set_language(lang)
+	_update_window_title()
+
+
+func _update_window_title() -> void:
+	OS.set_window_title(t("TITLE"))

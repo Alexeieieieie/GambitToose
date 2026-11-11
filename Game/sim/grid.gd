@@ -15,6 +15,7 @@ var graph_dirty = true
 
 # Conflict tracking for the tutorial crash event.
 var track_conflicts = false
+var hold_for_crash = false     # tutorial lesson 2: make sure the first conflict really happens
 var now = 0.0
 var conflict_times = {} # Vector2 -> [time axis 0, time axis 1]
 var conflicts = []      # cells where two axes met within one second
@@ -105,6 +106,11 @@ func try_enter(v, from: Vector2, to: Vector2) -> bool:
 	var ctrl = controllers.get(to)
 	if track_conflicts and ctrl == null and junctions.has(to):
 		_note_conflict(from, to)
+		if hold_for_crash and conflicts.empty() and v.wait_time < C.CRASH_HOLD_MAX:
+			# Hold the first truck until one from the other axis is also here.
+			var other = 1 - (0 if from.y == to.y else 1)
+			if now - conflict_times[to][other] > 0.2:
+				return false
 	var occ = occupants[to]
 	if occ.size() >= capacity(to):
 		return false

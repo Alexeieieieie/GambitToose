@@ -44,13 +44,13 @@ func _ready() -> void:
 	add_child(card)
 	hint_label = ThemeBuilder.label("", Rect2(40, 404, 620, 64), 16, true, Palette.NAVY, true)
 	card.add_child(hint_label)
-	var menu = ThemeBuilder.button(Strings.MENU, Rect2(40, 494, 150, 56), 18)
+	var menu = ThemeBuilder.button(Strings.t("MENU"), Rect2(40, 494, 150, 56), 18)
 	menu.connect("pressed", self, "_on_menu")
 	card.add_child(menu)
-	var again = ThemeBuilder.button(Strings.RESTART, Rect2(206, 494, 180, 56), 18)
+	var again = ThemeBuilder.button(Strings.t("RESTART"), Rect2(206, 494, 180, 56), 18)
 	again.connect("pressed", self, "_on_restart")
 	card.add_child(again)
-	next_btn = ThemeBuilder.button(Strings.NEXT_LEVEL, Rect2(402, 494, 258, 56), 18)
+	next_btn = ThemeBuilder.button(Strings.t("NEXT_LEVEL"), Rect2(402, 494, 258, 56), 18)
 	ThemeBuilder.paint(next_btn, Palette.YELLOW, Palette.NAVY)
 	next_btn.connect("pressed", self, "_on_next")
 	card.add_child(next_btn)
@@ -63,20 +63,20 @@ func show_result(sim, has_next: bool) -> void:
 	won = sim.won()
 	stars = m.stars(won)
 	if sim.result == "win":
-		title_text = Strings.WIN_TITLE
+		title_text = Strings.t("WIN_TITLE")
 	elif sim.result == "finished":
-		title_text = Strings.FINISH_TITLE
+		title_text = Strings.t("FINISH_TITLE")
 	elif sim.lose_reason == "patience":
-		title_text = Strings.LOSE_PATIENCE
+		title_text = Strings.t("LOSE_PATIENCE")
 	elif sim.lose_reason == "time":
-		title_text = Strings.LOSE_TIME
+		title_text = Strings.t("LOSE_TIME")
 	else:
-		title_text = Strings.LOSE_GRIDLOCK
-	score_text = Strings.SCORE % m.score()
+		title_text = Strings.t("LOSE_GRIDLOCK")
+	score_text = Strings.tf("SCORE", [m.score()])
 	stats = [
-		[Strings.DELIVERED, str(m.deliveries) if sim.mode != "goal" else Strings.PROGRESS % [m.deliveries, sim.goal]],
-		[Strings.AVG_DELIVERY, Strings.SECONDS % m.avg_delivery_time()],
-		[Strings.TIME_IN_JAMS, Strings.SECONDS % m.jam_seconds],
+		[Strings.t("DELIVERED"), str(m.deliveries) if sim.mode != "goal" else Strings.tf("PROGRESS", [m.deliveries, sim.goal])],
+		[Strings.t("AVG_DELIVERY"), Strings.tf("SECONDS", [m.avg_delivery_time()])],
+		[Strings.t("TIME_IN_JAMS"), Strings.tf("SECONDS", [m.jam_seconds])],
 	]
 	hint_text = make_hint(sim)
 	hint_label.text = hint_text
@@ -117,7 +117,7 @@ func _near(sim, cell: Vector2, radius: int, what: String):
 func make_hint(sim) -> String:
 	var g = sim.grid
 	if sim.result == "lose" and sim.lose_reason == "patience" and sim.lose_cell != null:
-		return Strings.HINT_PATIENCE % g.label(sim.lose_cell)
+		return Strings.t("HINT_PATIENCE")
 	var worst = sim.metrics.worst_jam_cell()
 	if sim.result == "lose" and sim.lose_reason == "gridlock":
 		var at = worst
@@ -126,25 +126,25 @@ func make_hint(sim) -> String:
 		if at == null and sim.vehicles.size() > 0:
 			at = sim.vehicles[0].cell
 		if at != null:
-			return Strings.HINT_GRIDLOCK % g.label(at)
-		return Strings.HINT_NO_JAM_LOSS
+			return Strings.tf("HINT_GRIDLOCK", [g.label(at)])
+		return Strings.t("HINT_NO_JAM_LOSS")
 	if worst == null or sim.metrics.jam_seconds < 5.0:
 		if sim.result == "lose":
-			return Strings.HINT_TIME
-		return Strings.HINT_CLEAN
+			return Strings.t("HINT_TIME")
+		return Strings.t("HINT_CLEAN")
 	var where = g.label(worst)
 	var light_cell = _near(sim, worst, 5, "light")
 	if light_cell != null and g.controllers[light_cell].mode == C.LightMode.TIMER:
-		return Strings.HINT_SENSOR % where
+		return Strings.tf("HINT_SENSOR", [where])
 	if light_cell == null and _near(sim, worst, 5, "junction") != null and sim.inventory["light"] > 0:
-		return Strings.HINT_LIGHT % where
+		return Strings.tf("HINT_LIGHT", [where])
 	if _near(sim, worst, 3, "water") != null and sim.inventory["bridge"] > 0:
-		return Strings.HINT_BRIDGE % where
+		return Strings.tf("HINT_BRIDGE", [where])
 	if sim.inventory["sorter"] > 0:
-		return Strings.HINT_SORTER % where
+		return Strings.tf("HINT_SORTER", [where])
 	if sim.inventory["light"] > 0:
-		return Strings.HINT_LIGHT % where
-	return Strings.HINT_SORTER % where
+		return Strings.tf("HINT_LIGHT", [where])
+	return Strings.tf("HINT_SORTER", [where])
 
 
 func _process(delta: float) -> void:

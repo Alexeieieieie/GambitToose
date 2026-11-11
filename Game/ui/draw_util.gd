@@ -85,3 +85,18 @@ static func triangle(ci: CanvasItem, center: Vector2, dir: Vector2, size: float,
 	var n = Vector2(-d.y, d.x)
 	ci.draw_colored_polygon(PoolVector2Array([center + d * size, center - d * size * 0.6 + n * size * 0.8,
 			center - d * size * 0.6 - n * size * 0.8]), color)
+
+
+static func wrap_lines(font: Font, text: String, width: float) -> int:
+	# How many lines a Label with autowrap will use (greedy word wrap).
+	var lines = 1
+	var cur = 0.0
+	var space = font.get_string_size(" ").x
+	for word in text.split(" "):
+		var w = font.get_string_size(word).x
+		if cur > 0.0 and cur + space + w > width * 0.97:
+			lines += 1
+			cur = w
+		else:
+			cur += (space if cur > 0.0 else 0.0) + w
+	return lines

@@ -8,12 +8,22 @@ const Sim = preload("res://sim/sim.gd")
 const Vehicle = preload("res://sim/vehicle.gd")
 const Intersection = preload("res://sim/intersection.gd")
 const LevelsScript = preload("res://autoload/levels.gd")
+const SaveDataScript = preload("res://autoload/save_data.gd")
+const TutorialData = preload("res://tutorial/tutorial_data.gd")
+const TutorialManager = preload("res://tutorial/tutorial_manager.gd")
+const TutorialSolver = preload("res://tutorial/tutorial_solver.gd")
+
+# Names the tutorial may highlight: every one is registered by the HUD or a panel.
+const UI_NAMES = ["tool_road", "tool_bridge", "tool_light", "tool_sorter", "tool_erase", "btn_pause",
+		"btn_speed_1", "btn_speed_2", "btn_speed_4", "btn_heatmap", "btn_help", "deliveries_bar",
+		"light_mode_timer", "light_mode_sensor", "light_mode_priority", "light_apply", "sorter_apply"]
 
 var failed = 0
 var passed = 0
 
 
-func _init() -> void:
+func _initialize() -> void:
+	# Not _init(): the autoload singletons (Strings, Sfx) exist from here on.
 	print("=== GridFlow tests ===")
 	test_pathfinding()
 	test_capacity_jam()
@@ -25,7 +35,14 @@ func _init() -> void:
 	test_performance()
 	test_no_manual_control()
 	test_offline()
-	test_strings()
+	test_strings_parity()
+	test_missing_keys()
+	test_no_hardcoded_text()
+	test_first_run()
+	test_lessons_solvable()
+	test_no_soft_locks()
+	test_tutorial_cannot_be_lost()
+	test_audio_files()
 	print("passed: %d, failed: %d" % [passed, failed])
 	if failed > 0:
 		print("TESTS FAILED")
@@ -360,6 +377,7 @@ func test_no_manual_control() -> void:
 	var files = []
 	list_files("res://view", ".gd", files)
 	list_files("res://ui", ".gd", files)
+	list_files("res://tutorial", ".gd", files)
 	var fields = ["path", "state", "pos", "progress", "idx", "speed", "wait_time", "unload_timer",
 			"from_cell", "reserved", "done", "dir", "dir_prev", "urgent", "repath_timer"]
 	var calls = ["vehicles.erase", "vehicles.remove", "vehicles.clear", "vehicles.pop", "vehicles.append",
@@ -450,6 +468,10 @@ func has_cyrillic(s: String) -> bool:
 	return false
 
 
+func has_letter(s: String) -> bool:
+	return has_latin(s) or has_cyrillic(s)
+
+
 func literal_after(s: String, at: int) -> String:
 	# The string literal that starts right after position `at` (spaces skipped), or "".
 	var j = at
@@ -461,26 +483,140 @@ func literal_after(s: String, at: int) -> String:
 	return lits[0] if lits.size() > 0 else "?"
 
 
-func test_strings() -> void:
-	# Player-facing text must come from autoload/strings.gd. So outside that file:
-	#  - no text assignment or text-drawing call may take a literal with Latin letters,
-	#  - no script in view/ or ui/ may contain a Cyrillic literal at all.
+func strip_key_calls(s: String) -> String:
+	# Removes Strings.t("KEY") and Strings.tf("KEY" so the key names are not mistaken for UI text.
+	var out = s
+	for head in ["Strings.t(\"", "Strings.tf(\"", "UiRegistry.register(\""]:
+		var at = out.find(head)
+		while at != -1:
+			var end = out.find("\"", at + head.length())
+			if end == -1:
+				break
+			out = out.substr(0, at) + "KEYCALL(" + out.substr(end + 1, out.length() - end - 1)
+			at = out.find(head)
+	return out
+
+
+func strings_tables() -> Dictionary:
+	var node = root.get_node("Strings")
+	return node.get_script().get_script_constant_map()
+
+
+func format_slots(s: String) -> Array:
+	var out = []
+	var i = 0
+	while i < s.length():
+		if s[i] == "%":
+			var j = i + 1
+			while j < s.length() and not (s[j] in ["s", "d", "f"]):
+				j += 1
+			out.append(s.substr(i, j - i + 1))
+			i = j
+		i += 1
+	return out
+
+
+# 12 --------------------------------------------------------------------------
+func test_strings_parity() -> void:
+	var t = strings_tables()
+	var en = t["EN"]
+	var ru = t["RU"]
+	var problems = []
+	for key in en.keys():
+		if not ru.has(key):
+			problems.append("missing in RU: " + key)
+		elif str(en[key]) == "" or str(ru[key]) == "":
+			problems.append("empty: " + key)
+		elif format_slots(en[key]) != format_slots(ru[key]):
+			problems.append("placeholders differ: " + key)
+	for key in ru.keys():
+		if not en.has(key):
+			problems.append("missing in EN: " + key)
+	for p in problems:
+		print("       " + p)
+	check("12 strings parity: EN and RU have the same keys and placeholders", problems.empty() and en.size() > 100,
+			"%d keys" % en.size())
+	# English mode must not contain Cyrillic anywhere.
+	var leaked = []
+	for key in en.keys():
+		if has_cyrillic(en[key]):
+			leaked.append(key)
+	check("12b english table has no Cyrillic text", leaked.empty(), str(leaked))
+
+
+# 13 --------------------------------------------------------------------------
+func test_missing_keys() -> void:
+	var en = strings_tables()["EN"]
 	var files = []
-	list_files("res://view", ".gd", files)
-	list_files("res://ui", ".gd", files)
-	list_files("res://autoload", ".gd", files)
-	var direct = ["text = ", "text=", "set_text(", "hint_tooltip = ", "window_title = ", "toast(",
-			"button(", "label(", "Button.new(", "Label.new(", "add_item("]
-	var draw_calls = ["draw_string(", "centered(", "left("]
-	var hits = []
+	list_files("res://", ".gd", files)
+	var missing = []
+	var used = 0
 	for path in files:
-		if path.ends_with("strings.gd"):
+		if path.begins_with("res://tests"):
 			continue
-		var in_ui = path.begins_with("res://view") or path.begins_with("res://ui")
 		var n = 0
 		for raw in read_lines(path):
 			n += 1
 			var s = strip_comment(raw)
+			for head in ["Strings.t(\"", "Strings.tf(\""]:
+				var at = s.find(head)
+				while at != -1:
+					var start = at + head.length()
+					var end = s.find("\"", start)
+					var key = s.substr(start, end - start)
+					used += 1
+					if not en.has(key):
+						missing.append("%s:%d %s" % [path, n, key])
+					at = s.find(head, end)
+			# Keys named in data tables (help sections, lesson text) by their prefix.
+			for lit in string_literals(s):
+				if lit.length() > 4 and (lit.begins_with("HELP_") or lit.begins_with("TUT_") or lit.begins_with("TOAST_")) \
+						and lit == lit.to_upper() and not en.has(lit):
+					missing.append("%s:%d %s" % [path, n, lit])
+	# Every key the lessons refer to.
+	for lesson in TutorialData.get_lessons():
+		var keys = [lesson["title_key"], lesson["level"]["name_key"]]
+		for step in lesson["steps"]:
+			keys.append(step["text_key"])
+			if step.has("hint_key"):
+				keys.append(step["hint_key"])
+			if step.has("button_key"):
+				keys.append(step["button_key"])
+			for item in step.get("checklist", []):
+				keys.append(item["key"])
+		for k in keys:
+			if not en.has(k):
+				missing.append("lesson %s: %s" % [lesson["id"], k])
+	for lv in LevelsScript.new().LEVELS:
+		if not en.has(lv["name_key"]):
+			missing.append("level name " + lv["name_key"])
+	for m in missing:
+		print("       " + m)
+	check("13 missing keys: every Strings.t key exists in EN", missing.empty() and used > 80, "%d lookups checked" % used)
+
+
+# 14 --------------------------------------------------------------------------
+func test_no_hardcoded_text() -> void:
+	# Player-facing text must come from autoload/strings.gd. Outside that file:
+	#  - no text assignment or text-drawing call may take a literal with letters,
+	#  - no script in view/, ui/ or tutorial/ may contain a Cyrillic literal at all.
+	var files = []
+	list_files("res://view", ".gd", files)
+	list_files("res://ui", ".gd", files)
+	list_files("res://tutorial", ".gd", files)
+	list_files("res://autoload", ".gd", files)
+	var direct = ["text = ", "text=", "set_text(", "hint_tooltip = ", "window_title = ", "set_window_title(", "toast(",
+			"button(", "label(", "Button.new(", "Label.new(", "add_item("]
+	var draw_calls = ["draw_string(", "centered(", "left("]
+	var hits = []
+	for path in files:
+		if path.ends_with("strings.gd") or path.ends_with("tutorial_data.gd"):
+			continue
+		var in_ui = not path.begins_with("res://autoload")
+		var n = 0
+		for raw in read_lines(path):
+			n += 1
+			var s = strip_key_calls(strip_comment(raw))
 			if in_ui:
 				for lit in string_literals(s):
 					if has_cyrillic(lit):
@@ -489,28 +625,181 @@ func test_strings() -> void:
 				var at = s.find(key)
 				while at != -1:
 					var lit = literal_after(s, at + key.length())
-					if has_latin(lit):
+					if has_letter(lit):
 						hits.append("%s:%d \"%s\"" % [path, n, lit])
 					at = s.find(key, at + 1)
 			for key in draw_calls:
 				if s.find(key) == -1:
 					continue
-				var rest = s
-				var q = rest.find("\"")
+				var q = s.find("\"")
 				while q != -1:
-					var lit = literal_after(rest, q)
+					var lit = literal_after(s, q)
 					var after = q + lit.length() + 2
-					var is_key = after < rest.length() and rest[after] == "]"
-					if has_latin(lit) and not is_key:
+					var is_dict_key = after < s.length() and s[after] == "]"
+					if has_letter(lit) and not is_dict_key:
 						hits.append("%s:%d \"%s\"" % [path, n, lit])
-					q = rest.find("\"", after)
+					q = s.find("\"", after)
 	for h in hits:
 		print("       " + h)
-	var levels = LevelsScript.new()
-	var names_ok = true
-	for lv in levels.LEVELS:
-		if has_latin(lv["name"]):
-			names_ok = false
-	levels.free()
-	check("11 strings: UI text is Russian and lives in strings.gd", hits.empty() and names_ok,
-			"%d files scanned" % files.size())
+	check("14 no hardcoded UI text outside strings.gd", hits.empty(), "%d files scanned" % files.size())
+
+
+# 15 --------------------------------------------------------------------------
+func test_first_run() -> void:
+	var path = "user://test_save.cfg"
+	var dir = Directory.new()
+	if dir.file_exists(path):
+		dir.remove(path)
+	var a = SaveDataScript.new()
+	a.path = path
+	a.load_data()
+	var fresh = a.is_first_run()
+	a.finish_tutorial(false)
+	var b = SaveDataScript.new()
+	b.path = path
+	var loaded = b.load_data()
+	var after = not b.is_first_run() and not b.tutorial_skipped
+	b.save_result(7, 1234, 2)
+	var c = SaveDataScript.new()
+	c.path = path
+	c.load_data()
+	var kept = c.get_best(7)["score"] == 1234 and c.get_best(7)["stars"] == 2 and not c.is_first_run()
+	check("15a first run: fresh install is a first run, then not", fresh and loaded and after and kept)
+	# A corrupt file must not crash and counts as a fresh install.
+	var f = File.new()
+	f.open(path, File.WRITE)
+	f.store_string("this is } not { a valid = config [[[ file\n=== ]]]")
+	f.close()
+	var d = SaveDataScript.new()
+	d.path = path
+	d.load_data()
+	var corrupt_ok = d.is_first_run() and d.language == "en"
+	f.open(path, File.WRITE)
+	f.store_string("[meta]\ntutorial_done=\"yes\"\nlanguage=42\nsound_on=7\n[score]\nabc=5\n")
+	f.close()
+	var e = SaveDataScript.new()
+	e.path = path
+	e.load_data()
+	var types_ok = e.is_first_run() and e.language == "en" and e.sound_on and e.best.empty()
+	var g = SaveDataScript.new()
+	g.path = "user://does_not_exist_%d.cfg" % OS.get_ticks_usec()
+	var missing_ok = g.load_data() == false and g.is_first_run()
+	check("15b first run: corrupt or missing save counts as a fresh install", corrupt_ok and types_ok and missing_ok)
+	d.path = path
+	d.delete_save()
+	for node in [a, b, c, d, e, g]:
+		node.free()
+
+
+# 16 --------------------------------------------------------------------------
+func test_lessons_solvable() -> void:
+	var lessons = TutorialData.get_lessons()
+	check("16a lessons: 6 lessons and a final test", lessons.size() == 7 and lessons[6].get("final", false))
+	for i in range(lessons.size()):
+		var lesson = lessons[i]
+		var sim = make_sim(lesson["level"])
+		var mgr = TutorialManager.new()
+		mgr.start(lesson, sim, i + 1, 6)
+		var err = TutorialSolver.run(sim, mgr, lesson)
+		var ok = err == "" and mgr.done
+		if lesson.get("final", false):
+			ok = ok and sim.result == "win"
+		check("16 lesson %s: solution completes it" % lesson["id"], ok,
+				err if err != "" else "t=%.0f s, deliveries=%d" % [sim.time, sim.metrics.deliveries])
+
+
+# 17 --------------------------------------------------------------------------
+func test_no_soft_locks() -> void:
+	var problems = []
+	for lesson in TutorialData.get_lessons():
+		var mgr = TutorialManager.new()
+		for step in lesson["steps"]:
+			var id = step["id"]
+			if not step.has("wait") or not step["wait"].has("event"):
+				problems.append(id + ": no wait condition")
+				continue
+			var e = step["wait"]["event"]
+			if not (e in TutorialManager.SUPPORTED):
+				problems.append(id + ": unsupported event " + e)
+			if e != "continue" and not step.has("hint_key"):
+				problems.append(id + ": action step without a hint")
+			for name in step.get("highlight_ui", []):
+				if not (name in UI_NAMES):
+					problems.append(id + ": unknown ui name " + name)
+			for item in step.get("checklist", []):
+				if not (item["cond"]["event"] in TutorialManager.SUPPORTED):
+					problems.append(id + ": unsupported checklist event")
+			if step.get("needs_panel", "") != "" and not (step["needs_panel"] in ["light", "sorter"]):
+				problems.append(id + ": bad needs_panel")
+		# Lessons and tools must be consistent with the level.
+		var allowed = lesson["level"].get("allowed_tools", [])
+		if allowed.empty():
+			problems.append(lesson["id"] + ": no allowed_tools")
+	for p in problems:
+		print("       " + p)
+	check("17 no soft locks: every step has a wait, a hint and known highlights", problems.empty())
+	# The hint and skip timers exist so a stuck player is never trapped.
+	var lesson = TutorialData.get_lesson(0)
+	var sim = make_sim(lesson["level"])
+	var mgr = TutorialManager.new()
+	mgr.start(lesson, sim, 1, 6)
+	mgr.notify("continue")
+	mgr.notify("continue")                       # now on the road step
+	var before = mgr.hint_available() or mgr.skip_available()
+	mgr.tick(TutorialManager.HINT_AFTER + 0.1)
+	var hint_ok = mgr.hint_available() and not mgr.skip_available()
+	mgr.tick(TutorialManager.SKIP_AFTER)
+	var skip_ok = mgr.skip_available()
+	var idx = mgr.idx
+	mgr.skip_step()
+	check("17b hint after 15 s, skip step after 30 s, skip really advances", not before and hint_ok and skip_ok and mgr.idx == idx + 1)
+
+
+# 18 --------------------------------------------------------------------------
+func test_tutorial_cannot_be_lost() -> void:
+	var lessons = TutorialData.get_lessons()
+	var all_ok = true
+	var details = ""
+	for i in range(6):
+		var lesson = lessons[i]
+		var sim = make_sim(lesson["level"])
+		# A deliberately bad network: whatever is prebuilt, with any lights stuck on red.
+		for l in sim.lights:
+			l.period = 100000.0
+			l.green_axis = 1
+		if lesson["id"] in ["l3", "l5"]:
+			sim.apply_action({"type": "light", "cell": Vector2(15, 7), "mode": C.LightMode.TIMER})
+			sim.lights[0].period = 100000.0
+			sim.lights[0].green_axis = 1
+		if lesson["id"] == "l1":
+			sim.apply_action({"type": "road_line", "from": Vector2(5, 7), "to": Vector2(10, 7)})  # a road to nowhere
+		run(sim, 60.0)
+		if sim.finished or sim.result != "":
+			all_ok = false
+			details += " %s:%s/%s" % [lesson["id"], sim.result, sim.lose_reason]
+	check("18 tutorial cannot be lost: 60 s of a bad network in lessons 1 to 6", all_ok, details)
+	# The final test, in contrast, can be lost.
+	var sim2 = make_sim(lessons[6]["level"])
+	run(sim2, 40.0)
+	check("18b the final test can be lost", sim2.finished and sim2.result == "lose", sim2.lose_reason)
+
+
+# 19 --------------------------------------------------------------------------
+func test_audio_files() -> void:
+	var names = root.get_node("Sfx").get_script().get_script_constant_map()["NAMES"].duplicate()
+	names.append("music")
+	names.append("siren")
+	var missing = []
+	var dir = Directory.new()
+	var total = 0
+	for n in names:
+		var path = "res://audio/%s.wav" % n
+		if not dir.file_exists(path):
+			missing.append(n)
+		else:
+			var f = File.new()
+			f.open(path, File.READ)
+			total += f.get_len()
+			f.close()
+	check("19 audio: every sound file exists and the total stays small", missing.empty() and total < 2500000,
+			"missing=%s total=%d KB" % [str(missing), total / 1024])
