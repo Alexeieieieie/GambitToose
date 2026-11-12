@@ -56,6 +56,7 @@ func _ready() -> void:
 	var x = 24.0
 	for m in modes:
 		var b = ThemeBuilder.button(m[1], Rect2(x, 66, 182, 52), 18)
+		Sfx.hover_hook(b)
 		b.connect("pressed", self, "_on_mode", [m[0]])
 		card.add_child(b)
 		mode_btns[m[0]] = b
@@ -77,6 +78,7 @@ func _ready() -> void:
 	card.add_child(period_slider)
 
 	urgent_btn = ThemeBuilder.button("", Rect2(24, 322, 572, 46), 16)
+	Sfx.hover_hook(urgent_btn)
 	urgent_btn.connect("pressed", self, "_on_urgent")
 	card.add_child(urgent_btn)
 
@@ -90,9 +92,11 @@ func _ready() -> void:
 	card.add_child(preview)
 
 	var cancel = ThemeBuilder.button(Strings.t("CANCEL"), Rect2(24, 448, 270, 52), 18)
+	Sfx.hover_hook(cancel)
 	cancel.connect("pressed", self, "_on_cancel")
 	card.add_child(cancel)
 	var apply = ThemeBuilder.button(Strings.t("APPLY"), Rect2(326, 448, 270, 52), 18)
+	Sfx.hover_hook(apply)
 	ThemeBuilder.paint(apply, Palette.YELLOW, Palette.NAVY)
 	apply.connect("pressed", self, "_on_apply")
 	card.add_child(apply)
@@ -152,7 +156,7 @@ func _sync() -> void:
 
 
 func _on_mode(m) -> void:
-	Sfx.play("click", 1.0, -6.0)
+	Sfx.play("ui_click", 1.0, -6.0)
 	chosen_mode = m
 	_sync()
 
@@ -162,20 +166,20 @@ func _on_slider(_value) -> void:
 
 
 func _on_urgent() -> void:
-	Sfx.play("click", 1.0, -6.0)
+	Sfx.play("ui_click", 1.0, -6.0)
 	chosen_urgent = not chosen_urgent
 	_sync()
 
 
 func _on_apply() -> void:
-	Sfx.play("place")
+	Sfx.play("place_light")
 	visible = false
 	emit_signal("applied", cell, chosen_mode, period_slider.value, int(threshold_slider.value), chosen_urgent)
 	emit_signal("closed")
 
 
 func _on_cancel() -> void:
-	Sfx.play("click", 1.0, -6.0)
+	Sfx.play("ui_click", 1.0, -6.0)
 	visible = false
 	emit_signal("closed")
 

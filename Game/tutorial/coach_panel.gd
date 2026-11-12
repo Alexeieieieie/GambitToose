@@ -85,7 +85,7 @@ func _button(caption: String, size: int, method: String) -> Button:
 func _on_step_changed(_step) -> void:
 	showing_done = false
 	if not first_step:
-		Sfx.play("step")
+		Sfx.play("tutorial_step")
 	first_step = false
 	layout_key = ""
 	_slide_in()
@@ -96,7 +96,7 @@ func _on_lesson_completed() -> void:
 		visible = false           # the game moves on to the completion screen
 		return
 	showing_done = true
-	Sfx.play("lesson")
+	Sfx.play("lesson_complete")
 	layout_key = ""
 	_slide_in()
 
@@ -111,33 +111,33 @@ func _slide_in() -> void:
 # ------------------------------------------------------------------ button handlers
 
 func _on_continue() -> void:
-	Sfx.play("click", 1.0, -4.0)
+	Sfx.play("ui_click", 1.0, -4.0)
 	manager.notify("continue")
 
 
 func _on_next() -> void:
-	Sfx.play("click")
+	Sfx.play("ui_click")
 	game.next_lesson()
 
 
 func _on_hint() -> void:
-	Sfx.play("click", 1.0, -6.0)
+	Sfx.play("ui_click", 1.0, -6.0)
 	manager.show_hint()
 	layout_key = ""
 
 
 func _on_skip_step() -> void:
-	Sfx.play("click", 1.0, -6.0)
+	Sfx.play("ui_click", 1.0, -6.0)
 	manager.skip_step()
 
 
 func _on_reset() -> void:
-	Sfx.play("click")
+	Sfx.play("ui_click")
 	game.restart()
 
 
 func _on_skip_tutorial() -> void:
-	Sfx.play("click", 1.0, -6.0)
+	Sfx.play("ui_click", 1.0, -6.0)
 	game.ask_skip_tutorial()
 
 

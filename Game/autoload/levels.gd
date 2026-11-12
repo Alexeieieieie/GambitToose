@@ -22,6 +22,11 @@ var LEVELS = [
 		"water": [], "obstacles": [],
 		"roads": _line(Vector2(15, 2), Vector2(15, 12)),
 		"inventory": {"road": 80, "light": 1, "sorter": 0, "bridge": 0},
+		"star_goals": [
+			{"type": "complete"},
+			{"type": "time_left_min", "value": 45},
+			{"type": "jam_seconds_max", "value": 5},
+		],
 		"solution": [
 			{"type": "road_line", "from": Vector2(3, 7), "to": Vector2(28, 7)},
 			{"type": "light", "cell": Vector2(15, 7), "mode": C.LightMode.SENSOR},
@@ -42,6 +47,11 @@ var LEVELS = [
 				Vector2(5, 13), Vector2(15, 12), Vector2(16, 12), Vector2(26, 13)],
 		"roads": [],
 		"inventory": {"road": 70, "light": 2, "sorter": 2, "bridge": 2},
+		"star_goals": [
+			{"type": "complete"},
+			{"type": "jam_seconds_max", "value": 25},
+			{"type": "urgent_min", "value": 5},
+		],
 		"solution": [
 			{"type": "road_line", "from": Vector2(3, 4), "to": Vector2(10, 4)},
 			{"type": "road_line", "from": Vector2(10, 5), "to": Vector2(10, 6)},
@@ -85,6 +95,11 @@ var LEVELS = [
 				Vector2(5, 13), Vector2(6, 13), Vector2(10, 1), Vector2(11, 1), Vector2(27, 7)],
 		"roads": [],
 		"inventory": {"road": 140, "light": 4, "sorter": 3, "bridge": 0},
+		"star_goals": [
+			{"type": "complete"},
+			{"type": "score_min", "value": 13400},
+			{"type": "patience_min", "value": 40},
+		],
 		"solution": [
 			{"type": "road_line", "from": Vector2(3, 3), "to": Vector2(28, 3)},
 			{"type": "road_line", "from": Vector2(3, 11), "to": Vector2(28, 11)},

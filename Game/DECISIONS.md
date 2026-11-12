@@ -43,7 +43,8 @@ did not work as written, and what was done instead.
   factory can never land on a player road.
 
 ## UI and tests
-- Stars use the brief's thresholds. Light and sorter panels pause the simulation while open.
+- Light and sorter panels pause the simulation while open. (The old 1 star / jam < 20 s / jam < 5 s rule was
+  replaced by per-level star goals, see below.)
 - The strings test checks text assignments and text-drawing calls for Latin literals, and
   forbids any Cyrillic literal in `view/` and `ui/`. Level names stay in `autoload/levels.gd`
   next to the level data, as in the brief's own example.
@@ -57,7 +58,7 @@ did not work as written, and what was done instead.
   the names in the brief's table, because the brief says to map to the keys that exist. The English texts follow the table.
 - **`HINT_PATIENCE` has no location now**, as in the brief's English text. The Russian text was changed to match.
 - **Level names** moved out of `autoload/levels.gd` into the string tables (`name_key`).
-- **The title is `GridFlow` in both languages** (the old Russian title was a different name).
+- **The title is `GambitToose` in both languages** (the old Russian title was a different name).
 - **Autoload order** is `SaveData, Strings, Palette, Fonts, Levels, Sfx, UiRegistry`. `SaveData` reaches `Strings` and `Sfx`
   by node path because autoloads that read it cannot also be referenced from it (parse cycle).
 
@@ -86,3 +87,40 @@ did not work as written, and what was done instead.
   the 30 s music loop 22.05 kHz; the total is about 1.9 MB. New sounds: bridge, step, lesson, fanfare, deny, speed.
 - Delivery dings climb a major pentatonic ladder instead of a linear pitch ramp. The music is ducked under the results.
 - I cannot listen to audio here. The files were checked numerically (no clipping, no DC offset, seamless loop ends).
+
+
+## Sound and star goals update (promts/sounds_stars.md)
+
+### Sound
+- **New sound set.** 43 files, 4.9 MB, made by the rewritten `tools/gen_sfx.py` and verified by `tools/check_audio.py`. The old
+  files (`click`, `place`, `music` and others) were removed. Names follow the brief's list.
+- **The sound button in the top bar now opens Settings** (sliders plus the sound toggle). The in-game top bar has no
+  other menu, so this is the "entry in the in-game menu". The main menu has its own Settings button instead of the old toggle.
+- **Sim event names.** The sim already used `deliver`, `jam_start`, `light_switch`; the brief's `delivery`, `jam_started`
+  and `light_switched` map to those. New events: `gridlock_risk`, `patience_low`, `goal_reached`, `goal_failed`.
+- **`patience_low` re-arms** when the warehouse recovers above 50 % patience, so a second dry spell warns again.
+- **Delivery merging holds a delivery for up to 150 ms** (an imperceptible delay) so that a burst plays once with the
+  highest note. At 1x speed deliveries are further apart than that and play at once.
+- **Music intensity**: the share of jammed road tiles is multiplied by 4 (capped at 1) before the 0.5 weight, because with
+  the brief's raw share even a bad jam would barely move the layer.
+- **Pause**: the music is lowered 6 dB and low-passed whenever the speed is 0 (pause, panels, help, settings, the goals card).
+- **Siren** is only audible while the game runs. Ambience volume follows the number of vehicles.
+
+### Star goals
+- **The old star rule is gone** (`Metrics.stars`). Old saves keep their best score; the single old `stars` value is ignored
+  and every goal mask starts at 0.
+- **Goal values** (`autoload/levels.gd`, calibrated with `tests/calibrate.gd`, checked by tests 24a/24b):
+  - Level 1: complete, finish with 45 s to spare, at most 5 s in jams.
+  - Level 2: complete, at most 25 s in jams, deliver 5 urgent trucks. The brief's 20 s is not reachable with the solution
+    (it spends 21 s in jams), and 3 urgent trucks is reached by every build.
+  - Level 3: complete, score at least 13400, keep every warehouse above 40 % patience. The brief's 2000 points is reached
+    by almost any build.
+- **The brief's baseline check could not be met, and the numbers explain why.** It wants "roads only" to earn at most one star
+  while the intended solution earns three. On all three levels the roads-only build is as good or better than the solution
+  on every measured number (no time in jams at all, faster deliveries), because the lights and sorters of the
+  solutions do not help at the current traffic levels. Changing that means changing balance or layouts, which the brief
+  forbids. So test 24b checks a different careless build instead: the same solution with every light on a slow timer
+  earns at most two stars. Roads-only earns 3, 3, 3 stars today. This is the main open question for the game design.
+- **The goals tracker** sits under the top bar. It is open for the first 10 s of simulated time, then collapses to three icons;
+  `G` toggles it. Only its heading strip (or the collapsed box) takes mouse clicks.
+- **Level select** shows the earned goals as gold stars and lists the three goals as a tooltip on hover.

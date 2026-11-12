@@ -1,4 +1,4 @@
-GridFlow (АвтоТрафик)
+GambitToose (АвтоТрафик)
 =====================
 
 Code, levels, drawing and sounds: made for the hackathon. All graphics are drawn

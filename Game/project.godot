@@ -10,18 +10,18 @@ config_version=4
 
 [application]
 
-config/name="GridFlow"
+config/name="GambitToose"
 run/main_scene="res://ui/boot.tscn"
 config/icon="res://icon.png"
 
 [autoload]
 
-SaveData="*res://autoload/save_data.gd"
 Strings="*res://autoload/strings.gd"
 Palette="*res://autoload/palette.gd"
 Fonts="*res://autoload/fonts.gd"
 Levels="*res://autoload/levels.gd"
 Sfx="*res://autoload/sfx.gd"
+SaveData="*res://autoload/save_data.gd"
 UiRegistry="*res://autoload/ui_registry.gd"
 
 [display]

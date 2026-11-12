@@ -10,7 +10,11 @@ var tutorial_done = false
 var tutorial_skipped = false
 var language = "en"
 var sound_on = true
-var best = {}                    # level id -> {"score", "stars", "played"}
+var vol_master = 100             # 0..100
+var vol_music = 60
+var vol_effects = 90
+var best = {}                    # level id -> {"score", "played"}
+var goal_masks = {}              # level id -> bit mask of the star goals ever earned (bit i = goal i)
 
 
 func _ready() -> void:
@@ -22,7 +26,17 @@ func _reset_values() -> void:
 	tutorial_skipped = false
 	language = "en"
 	sound_on = true
+	vol_master = 100
+	vol_music = 60
+	vol_effects = 90
 	best = {}
+	goal_masks = {}
+
+
+func _as_volume(v, default: int) -> int:
+	if typeof(v) != TYPE_INT and typeof(v) != TYPE_REAL:
+		return default
+	return int(clamp(int(v), 0, 100))
 
 
 func _as_bool(v) -> bool:
@@ -39,6 +53,9 @@ func load_data() -> bool:
 	tutorial_skipped = _as_bool(cfg.get_value("meta", "tutorial_skipped", false))
 	sound_on = not (typeof(cfg.get_value("meta", "sound_on", true)) == TYPE_BOOL \
 			and cfg.get_value("meta", "sound_on", true) == false)
+	vol_master = _as_volume(cfg.get_value("meta", "vol_master", 100), 100)
+	vol_music = _as_volume(cfg.get_value("meta", "vol_music", 60), 60)
+	vol_effects = _as_volume(cfg.get_value("meta", "vol_effects", 90), 90)
 	var lang = cfg.get_value("meta", "language", "en")
 	language = lang if (typeof(lang) == TYPE_STRING and lang in ["en", "ru"]) else "en"
 	if cfg.has_section("score"):
@@ -48,9 +65,14 @@ func load_data() -> bool:
 			var id = int(key)
 			best[id] = {
 				"score": int(cfg.get_value("score", key, 0)),
-				"stars": int(clamp(int(cfg.get_value("stars", key, 0)), 0, 3)),
 				"played": _as_bool(cfg.get_value("played", key, false)),
 			}
+	# Old saves had a "stars" section from the previous star rule: it is ignored on purpose.
+	if cfg.has_section("goals"):
+		for key in cfg.get_section_keys("goals"):
+			if key.is_valid_integer():
+				var m = cfg.get_value("goals", key, 0)
+				goal_masks[int(key)] = int(m) & 7 if typeof(m) == TYPE_INT else 0
 	return true
 
 
@@ -60,10 +82,14 @@ func save_data() -> void:
 	cfg.set_value("meta", "tutorial_skipped", tutorial_skipped)
 	cfg.set_value("meta", "language", language)
 	cfg.set_value("meta", "sound_on", sound_on)
+	cfg.set_value("meta", "vol_master", vol_master)
+	cfg.set_value("meta", "vol_music", vol_music)
+	cfg.set_value("meta", "vol_effects", vol_effects)
 	for id in best.keys():
 		cfg.set_value("score", str(id), best[id]["score"])
-		cfg.set_value("stars", str(id), best[id]["stars"])
 		cfg.set_value("played", str(id), best[id]["played"])
+	for id in goal_masks.keys():
+		cfg.set_value("goals", str(id), goal_masks[id])
 	cfg.save(path)
 
 
@@ -89,18 +115,45 @@ func set_sound(on: bool) -> void:
 	save_data()
 
 
+func set_volumes(v_master: int, v_music: int, v_effects: int) -> void:
+	vol_master = int(clamp(v_master, 0, 100))
+	vol_music = int(clamp(v_music, 0, 100))
+	vol_effects = int(clamp(v_effects, 0, 100))
+	save_data()
+
+
 func get_best(id: int) -> Dictionary:
-	return best.get(id, {"score": 0, "stars": 0, "played": false})
+	return best.get(id, {"score": 0, "played": false})
 
 
-func save_result(id: int, score: int, stars: int) -> void:
+func get_mask(id: int) -> int:
+	return int(goal_masks.get(id, 0))
+
+
+func get_stars(id: int) -> int:
+	return popcount(get_mask(id))
+
+
+static func popcount(mask: int) -> int:
+	var n = 0
+	for i in range(3):
+		if mask & (1 << i):
+			n += 1
+	return n
+
+
+func save_result(id: int, score: int, mask: int) -> int:
+	# Earned goals stay earned: the new mask is ORed into the old one.
+	# Returns the bits that are new in this run.
 	var b = get_best(id)
 	if not b["played"] or score > b["score"]:
 		b["score"] = score
-	b["stars"] = int(max(b["stars"], stars))
 	b["played"] = true
 	best[id] = b
+	var old = get_mask(id)
+	goal_masks[id] = (old | mask) & 7
 	save_data()
+	return mask & ~old & 7
 
 
 func delete_save() -> void:

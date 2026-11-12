@@ -2,6 +2,9 @@ extends Reference
 
 var deliveries = 0
 var urgent_deliveries = 0
+var time_left = 0.0
+var roads_used = 0
+var min_patience_ratio = 1.0     # the lowest patience ratio any active warehouse reached
 var total_delivery_time = 0.0
 var jam_seconds = 0.0
 var jam_cells = {}               # Vector2 -> seconds a jammed vehicle stood there
@@ -16,16 +19,6 @@ func avg_delivery_time() -> float:
 
 func score() -> int:
 	return deliveries * 100 - int(avg_delivery_time() * 2) - int(jam_seconds * 10)
-
-
-func stars(won: bool) -> int:
-	if not won:
-		return 0
-	if jam_seconds < 5.0:
-		return 3
-	if jam_seconds < 20.0:
-		return 2
-	return 1
 
 
 func add_jam_cell(cell: Vector2, dt: float) -> void:

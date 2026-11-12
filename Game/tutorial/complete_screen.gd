@@ -26,7 +26,7 @@ func _ready() -> void:
 	var menu = ThemeBuilder.button(Strings.t("MAIN_MENU"), Rect2(650, 430, 300, 64), 22)
 	menu.connect("pressed", self, "_on_menu")
 	add_child(menu)
-	Sfx.play("fanfare")
+	Sfx.play("win")
 
 
 func _process(delta: float) -> void:
@@ -44,12 +44,12 @@ func _draw() -> void:
 
 
 func _on_play() -> void:
-	Sfx.play("click")
+	Sfx.play("ui_click")
 	Levels.mode = "level"
 	Levels.current = 0
 	get_tree().change_scene("res://view/game.tscn")
 
 
 func _on_menu() -> void:
-	Sfx.play("click")
+	Sfx.play("ui_click")
 	get_tree().change_scene("res://ui/main_menu.tscn")

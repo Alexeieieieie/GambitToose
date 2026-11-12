@@ -41,12 +41,12 @@ func open() -> void:
 
 
 func _on_yes() -> void:
-	Sfx.play("click")
+	Sfx.play("ui_click")
 	visible = false
 	emit_signal("confirmed")
 
 
 func _on_no() -> void:
-	Sfx.play("click", 1.0, -6.0)
+	Sfx.play("ui_click", 1.0, -6.0)
 	visible = false
 	emit_signal("cancelled")

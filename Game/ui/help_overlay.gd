@@ -9,7 +9,7 @@ const ThemeBuilder = preload("res://ui/theme_builder.gd")
 
 const SCREEN = Vector2(1280, 720)
 const SECTIONS = [["HELP_H_GOAL", "HELP_GOAL"], ["HELP_H_TOOLS", "HELP_TOOLS"], ["HELP_H_LIGHTS", "HELP_LIGHTS"],
-		["HELP_H_URGENT", "HELP_URGENT"], ["HELP_H_HEATMAP", "HELP_HEATMAP"], ["HELP_H_CONTROLS", "HELP_CONTROLS"]]
+		["HELP_H_URGENT", "HELP_URGENT"], ["HELP_H_HEATMAP", "HELP_HEATMAP"], ["HELP_H_STARS", "HELP_STARS"], ["HELP_H_CONTROLS", "HELP_CONTROLS"]]
 
 var card
 var close_btn
@@ -60,6 +60,6 @@ func open() -> void:
 func close() -> void:
 	if not visible:
 		return
-	Sfx.play("click", 1.0, -6.0)
+	Sfx.play("ui_click", 1.0, -6.0)
 	visible = false
 	emit_signal("closed")

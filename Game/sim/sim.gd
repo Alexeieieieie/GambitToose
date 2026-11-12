@@ -12,11 +12,14 @@ const Factory = preload("res://sim/factory.gd")
 const Warehouse = preload("res://sim/warehouse.gd")
 const Metrics = preload("res://sim/metrics.gd")
 const Pathing = preload("res://sim/pathing.gd")
+const Goals = preload("res://sim/goals.gd")
 
 var level = {}
 var grid
 var pathing
 var metrics
+var goals                        # star goals: a read-only observer
+var goals_enabled = true
 var rng = RandomNumberGenerator.new()
 
 var vehicles = []
@@ -42,6 +45,7 @@ var lose_cell = null
 
 var density = {}                 # Vector2 -> smoothed occupancy 0..1
 var still_time = 0.0             # seconds without any vehicle moving
+var risk_mark = -1               # last whole second a gridlock_risk event was pushed for
 var jam_active = false
 var crash_done = false
 var weight_timer = 0.0
@@ -56,6 +60,8 @@ func load_level(lv: Dictionary) -> void:
 	grid.setup()
 	pathing = Pathing.new()
 	metrics = Metrics.new()
+	goals = Goals.new()
+	goals.setup(lv)
 	rng.seed = lv.get("seed", 1)
 	time_limit = float(lv.get("time", 240))
 	goal = int(lv.get("goal", 0))
@@ -431,6 +437,10 @@ func step(dt: float) -> void:
 	if deadlock_timer >= C.DEADLOCK_CHECK_INTERVAL:
 		deadlock_timer = 0.0
 		_check_deadlock()
+	metrics.time_left = time_left()
+	metrics.roads_used = grid.player_built.size()
+	if goals_enabled:
+		goals.tick(self)
 	if grid.track_conflicts and not crash_done and grid.conflicts.size() > 0:
 		crash_done = true
 		events.append({"type": "crash", "cell": grid.conflicts[0]})
@@ -508,12 +518,27 @@ func _tick_warehouses(dt: float) -> void:
 		if not color_active(w.color):
 			continue
 		w.drain(dt)
+		_observe_patience(w)
 		if not lose_enabled:
 			if w.patience <= 1.0:
 				w.patience = C.WAREHOUSE_PATIENCE_MAX   # tutorial: the bar clamps and refills
 			continue
 		if w.patience <= 0.0 and not finished:
 			_finish("lose", "patience", w.cell)
+
+
+func _observe_patience(w) -> void:
+	# Read-only bookkeeping: the lowest ratio so far, and one warning per threshold.
+	var r = w.ratio()
+	if r < metrics.min_patience_ratio:
+		metrics.min_patience_ratio = r
+	for pct in C.PATIENCE_LOW_PERCENT:
+		if r * 100.0 < pct:
+			if not w.low_flags.get(pct, false):
+				w.low_flags[pct] = true
+				events.append({"type": "patience_low", "cell": w.cell, "threshold": pct})
+		elif r * 100.0 >= C.PATIENCE_REARM_PERCENT:
+			w.low_flags[pct] = false
 
 
 func _tick_jams(dt: float) -> void:
@@ -539,8 +564,12 @@ func _tick_gridlock(dt: float) -> void:
 			break
 	if moving or vehicles.size() < C.GRIDLOCK_MIN_VEHICLES:
 		still_time = 0.0
+		risk_mark = -1
 		return
 	still_time += dt
+	if still_time >= C.GRIDLOCK_RISK_SECONDS and int(still_time) != risk_mark:
+		risk_mark = int(still_time)      # once per second while frozen (read-only observation)
+		events.append({"type": "gridlock_risk", "seconds": int(still_time)})
 	if still_time >= C.GRIDLOCK_SECONDS and not finished and lose_enabled:
 		_finish("lose", "gridlock", null)
 
@@ -614,6 +643,8 @@ func _finish(res: String, reason: String, cell) -> void:
 	result = res
 	lose_reason = reason
 	lose_cell = cell
+	if goals_enabled:
+		goals.finalize(self, won())
 	events.append({"type": "finished", "result": res, "reason": reason})
 
 

@@ -5,11 +5,13 @@ extends Control
 const DrawUtil = preload("res://ui/draw_util.gd")
 const ThemeBuilder = preload("res://ui/theme_builder.gd")
 const Backdrop = preload("res://ui/backdrop.gd")
+const SettingsPanel = preload("res://ui/settings_panel.gd")
 
 const SCREEN = Vector2(1280, 720)
 
 var clock = 0.0
-var sound_btn
+var settings_btn
+var settings
 var lang_btn
 var trucks = []
 
@@ -23,23 +25,22 @@ func _ready() -> void:
 	ThemeBuilder.paint(play, Palette.YELLOW, Palette.NAVY)
 	_button(Strings.t("LEVELS"), Rect2(480, y + 66, 320, 56), 24, "_on_levels")
 	_button(Strings.t("TUTORIAL"), Rect2(480, y + 132, 320, 56), 24, "_on_tutorial")
-	sound_btn = _button("", Rect2(480, y + 198, 120, 50), 16, "_on_sound")
-	lang_btn = _button(Strings.t("LANGUAGE_BTN"), Rect2(610, y + 198, 190, 50), 16, "_on_language")
+	settings_btn = _button(Strings.t("SETTINGS"), Rect2(480, y + 198, 150, 50), 16, "_on_settings")
+	lang_btn = _button(Strings.t("LANGUAGE_BTN"), Rect2(640, y + 198, 160, 50), 16, "_on_language")
 	_button(Strings.t("EXIT"), Rect2(480, y + 258, 320, 56), 24, "_on_exit")
-	_sync_sound()
+	settings = SettingsPanel.new()
+	add_child(settings)
 	Sfx.set_speed(1.0)
 	Sfx.set_siren(false)
+	Sfx.start_menu_music()
 
 
 func _button(caption: String, r: Rect2, size: int, method: String) -> Button:
 	var b = ThemeBuilder.button(caption, r, size)
 	b.connect("pressed", self, method)
 	add_child(b)
+	Sfx.hover_hook(b)
 	return b
-
-
-func _sync_sound() -> void:
-	sound_btn.text = Strings.t("SOUND_ON") if Sfx.enabled else Strings.t("SOUND_OFF")
 
 
 func _process(delta: float) -> void:
@@ -54,34 +55,33 @@ func _draw() -> void:
 
 
 func _on_play() -> void:
-	Sfx.play("click")
+	Sfx.play("ui_click")
 	Levels.mode = "level"
 	Levels.current = 0
 	get_tree().change_scene("res://view/game.tscn")
 
 
 func _on_levels() -> void:
-	Sfx.play("click")
+	Sfx.play("ui_click")
 	get_tree().change_scene("res://ui/level_select.tscn")
 
 
 func _on_tutorial() -> void:
 	# Replaying never changes saved progress.
-	Sfx.play("click")
+	Sfx.play("ui_click")
 	Levels.mode = "tutorial"
 	Levels.tutorial_index = 0
 	get_tree().change_scene("res://view/game.tscn")
 
 
-func _on_sound() -> void:
-	Sfx.toggle()
-	Sfx.play("click")
-	_sync_sound()
+func _on_settings() -> void:
+	Sfx.play("ui_click")
+	settings.open()
 
 
 func _on_language() -> void:
 	Strings.set_lang("ru" if Strings.lang == "en" else "en")
-	Sfx.play("click")
+	Sfx.play("ui_click")
 	get_tree().reload_current_scene()
 
 

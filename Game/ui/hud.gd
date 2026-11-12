@@ -34,6 +34,7 @@ var toast_time = 0.0
 var fps_on = false
 var tween
 var shown = {}                   # last values pushed into the buttons
+var flashes = {}                 # tool id -> seconds left of the red "no items" flash
 
 
 func setup(game_) -> void:
@@ -54,7 +55,7 @@ func setup(game_) -> void:
 		x += 56.0
 	help_btn = _button(Strings.t("HELP_BTN"), Rect2(994, 9, 44, 38), "_on_help")
 	help_btn.hint_tooltip = Strings.t("HELP")
-	sound_btn = _button(Strings.t("SOUND_ON"), Rect2(1046, 9, 120, 38), "_on_sound")
+	sound_btn = _button(Strings.t("SETTINGS"), Rect2(1046, 9, 120, 38), "_on_sound")
 	menu_btn = _button(Strings.t("MENU"), Rect2(1174, 9, 94, 38), "_on_menu")
 	UiRegistry.register("btn_pause", pause_btn)
 	UiRegistry.register("btn_help", help_btn)
@@ -110,7 +111,7 @@ func _button(caption: String, r: Rect2, method: String, binds: Array = []) -> Bu
 
 
 func _pop(b: Button) -> void:
-	Sfx.play("click", 1.0, -6.0)
+	Sfx.play("ui_click")
 	tween.interpolate_property(b, "rect_scale", Vector2(0.88, 0.88), Vector2(1, 1), 0.18,
 			Tween.TRANS_BACK, Tween.EASE_OUT)
 	tween.start()
@@ -155,6 +156,10 @@ func pause_rect() -> Rect2:
 	return Rect2(pause_btn.rect_position, pause_btn.rect_size)
 
 
+func flash_tool(id: int) -> void:
+	flashes[id] = 0.45
+
+
 func toast(msg: String, seconds: float = 2.5) -> void:
 	toast_text = msg
 	toast_time = seconds
@@ -165,6 +170,10 @@ func _process(delta: float) -> void:
 		return
 	if toast_time > 0.0:
 		toast_time -= delta
+	for id in flashes.keys():
+		flashes[id] -= delta
+		if flashes[id] <= 0.0:
+			flashes.erase(id)
 	_refresh(false)
 	update()
 	overlay.update()
@@ -194,8 +203,6 @@ func _refresh(force: bool) -> void:
 				ThemeBuilder.paint(speed_btns[value], Palette.YELLOW, Palette.NAVY)
 			else:
 				ThemeBuilder.paint(speed_btns[value], Palette.NAVY_LIGHT, Palette.WHITE)
-	if _changed("sound", Sfx.enabled):
-		sound_btn.text = Strings.t("SOUND_ON") if Sfx.enabled else Strings.t("SOUND_OFF")
 	if _changed("heat", game.heatmap_on):
 		heat_btn.text = Strings.tf("TOGGLE", [Strings.t("HEATMAP"), Strings.t("ON")]) if game.heatmap_on else Strings.t("HEATMAP")
 		ThemeBuilder.paint(heat_btn, Palette.HEATMAP_BTN, Palette.NAVY, game.heatmap_on)
@@ -203,7 +210,7 @@ func _refresh(force: bool) -> void:
 		var id = info[0]
 		var count = -1 if info[2] == "" else game.sim.inventory[info[2]]
 		var allowed = game.is_tool_allowed(id)
-		if _changed("tool%d" % id, [count, game.current_tool == id, allowed]):
+		if _changed("tool%d" % id, [count, game.current_tool == id, allowed, flashes.has(id)]):
 			var b = tool_btns[id]
 			b.text = info[1] if count < 0 else Strings.tf("COUNT", [info[1], count])
 			b.disabled = not allowed
@@ -213,6 +220,9 @@ func _refresh(force: bool) -> void:
 			if not allowed:
 				bg = Palette.NAVY_MID
 				fg = Palette.alpha(Palette.TEXT_DIM, 0.55)
+			if flashes.has(id):
+				bg = Palette.RED
+				fg = Palette.WHITE
 			ThemeBuilder.paint(b, bg, fg, game.current_tool == id and allowed)
 
 

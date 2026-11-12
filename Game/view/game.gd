@@ -18,6 +18,10 @@ const LightPanel = preload("res://ui/light_panel.gd")
 const SorterPanel = preload("res://ui/sorter_panel.gd")
 const HelpOverlay = preload("res://ui/help_overlay.gd")
 const ConfirmDialog = preload("res://ui/confirm_dialog.gd")
+const SettingsPanel = preload("res://ui/settings_panel.gd")
+const GoalsPanel = preload("res://ui/goals_panel.gd")
+const LevelIntro = preload("res://ui/level_intro.gd")
+const Goals = preload("res://sim/goals.gd")
 const Results = preload("res://ui/results.gd")
 const TutorialData = preload("res://tutorial/tutorial_data.gd")
 const TutorialManager = preload("res://tutorial/tutorial_manager.gd")
@@ -44,6 +48,7 @@ var last_cell = C.NO_CELL
 var ended = false
 var siren_timer = 0.0
 var help_prev_speed = 0.0
+var overlay_prev_speed = 0.0
 
 var world
 var grid_view
@@ -55,7 +60,10 @@ var hud
 var light_panel
 var sorter_panel
 var help
+var settings
 var confirm
+var goals_panel
+var intro
 var coach
 var highlight
 var results
@@ -94,6 +102,10 @@ func _ready() -> void:
 	hud.connect("sound_pressed", self, "_on_sound")
 	hud.connect("menu_pressed", self, "go_menu")
 	hud.connect("help_pressed", self, "open_help")
+	if not is_tutorial and sim.goals.count() > 0:
+		goals_panel = GoalsPanel.new()
+		ui.add_child(goals_panel)
+		goals_panel.setup(sim)
 	light_panel = LightPanel.new()
 	ui.add_child(light_panel)
 	light_panel.connect("applied", self, "_on_light_applied")
@@ -105,6 +117,9 @@ func _ready() -> void:
 	help = HelpOverlay.new()
 	ui.add_child(help)
 	help.connect("closed", self, "_on_help_closed")
+	settings = SettingsPanel.new()
+	ui.add_child(settings)
+	settings.connect("closed", self, "_on_settings_closed")
 	if is_tutorial:
 		_setup_tutorial(ui)
 	confirm = ConfirmDialog.new()
@@ -116,10 +131,17 @@ func _ready() -> void:
 	results.connect("next_pressed", self, "next_level")
 	results.connect("menu_pressed", self, "go_menu")
 
+	Sfx.start_level_audio(sim)
 	Sfx.set_speed(1.0)
-	Sfx.reset_streak()
-	Sfx.duck(false)
-	if not is_tutorial:
+	Sfx.set_paused(true)
+	if goals_panel != null:
+		# The goals card is shown first; the simulation stays paused so the player can build.
+		intro = LevelIntro.new()
+		ui.add_child(intro)
+		intro.setup(sim)
+		intro.connect("started", self, "_on_intro_started")
+		modal = true
+	elif not is_tutorial:
 		hud.toast(Strings.t("TOAST_PAUSED"), 4.0)
 
 
@@ -209,17 +231,12 @@ func _drain_events() -> void:
 	sim.events = []
 	for ev in list:
 		var kind = ev["type"]
+		Sfx.handle_event(ev)           # the audio director decides what (if anything) to play
 		if kind == "deliver":
-			Sfx.delivery_sound(ev["jam"])
 			fx.add("deliver", [ev["cell"]], 0.5, Palette.cargo(ev["color"]))
 		elif kind == "jam_start":
-			Sfx.warn()
-			Sfx.reset_streak()
 			hud.toast(Strings.t("TOAST_JAM"), 1.5)
-		elif kind == "light_switch":
-			Sfx.play("tick", 1.0, -10.0)
 		elif kind == "crash":
-			Sfx.play("crash")
 			fx.add("crash", [ev["cell"]], 2.5)
 			_apply_speed(0.0)
 			if tutorial != null:
@@ -229,11 +246,26 @@ func _drain_events() -> void:
 			hud.toast(Strings.tf("TOAST_DEADLOCK", [sim.grid.label(ev["cells"][0])]), 2.5)
 		elif kind == "new_building":
 			grid_view.update()
-			Sfx.play("place", 0.7)
+			Sfx.play("tutorial_step", 1.0, -4.0)
 			fx.add("new", ev["cells"], 6.0)
 			hud.toast(Strings.t("TOAST_NEW_BUILDING"), 4.0)
+		elif kind == "goal_reached" or kind == "goal_failed":
+			_on_goal_event(kind, int(ev["index"]))
 		elif kind == "finished":
 			_on_finished()
+
+
+func _on_goal_event(kind: String, index: int) -> void:
+	if goals_panel == null:
+		return
+	goals_panel.pop(index)
+	var key = "TOAST_GOAL_REACHED" if kind == "goal_reached" else "TOAST_GOAL_MISSED"
+	hud.toast(Strings.t(key) + "  " + goals_panel.goal_text(index), 2.6)
+
+
+func _on_intro_started() -> void:
+	modal = ended or help.visible or settings.visible
+	hud.toast(Strings.t("TOAST_PAUSED"), 4.0)
 
 
 func _on_finished() -> void:
@@ -244,6 +276,7 @@ func _on_finished() -> void:
 	painting = false
 	Sfx.set_siren(false)
 	var won = sim.won()
+	var new_bits = 0
 	if sim.lose_cell != null:
 		fx.add("crash", [sim.lose_cell], 3.0)
 	if tutorial != null:
@@ -255,11 +288,11 @@ func _on_finished() -> void:
 		next_lesson()
 		return
 	if not is_tutorial:
-		SaveData.save_result(level["id"], sim.metrics.score(), sim.metrics.stars(won))
+		new_bits = SaveData.save_result(level["id"], sim.metrics.score(), sim.goals.earned_mask())
+	Sfx.results_started()
 	Sfx.play("win" if won else "lose")
-	Sfx.duck(true)
 	yield(get_tree().create_timer(0.9), "timeout")
-	results.show_result(sim, Levels.has_next() and not is_tutorial)
+	results.show_result(sim, Levels.has_next() and not is_tutorial, new_bits)
 
 
 # ---------------------------------------------------------------- controls
@@ -270,6 +303,7 @@ func _apply_speed(value: float) -> void:
 		last_speed = value
 	speed = value
 	Sfx.set_speed(last_speed)
+	Sfx.set_paused(speed == 0.0)
 	if speed == 0.0:
 		Sfx.set_siren(false)
 
@@ -277,7 +311,14 @@ func _apply_speed(value: float) -> void:
 func set_speed(value: float) -> void:
 	var was_paused = speed == 0.0
 	if value != speed:
-		Sfx.play("speed", 0.85 + 0.15 * value, -6.0)
+		if value == 0.0:
+			Sfx.play("pause")
+		elif was_paused:
+			Sfx.play("resume")
+		elif value > speed:
+			Sfx.play("speed_up")
+		else:
+			Sfx.play("speed_down")
 	_apply_speed(value)
 	if tutorial != null:
 		if was_paused and value > 0.0:
@@ -294,8 +335,10 @@ func toggle_pause() -> void:
 
 func set_tool(id: int) -> void:
 	if not is_tool_allowed(id):
-		Sfx.play("deny", 1.0, -6.0)
+		Sfx.play("invalid", 1.0, -3.0)
 		return
+	if id != current_tool:
+		Sfx.play("tool_select")
 	current_tool = id
 
 
@@ -303,17 +346,36 @@ func toggle_heatmap() -> void:
 	heatmap_on = not heatmap_on
 	heatmap.visible = heatmap_on
 	heatmap.update()
-	Sfx.play("tick", 0.8, -4.0)
+	Sfx.play("ui_toggle_on" if heatmap_on else "ui_toggle_off")
 	if tutorial != null:
 		tutorial.notify("heatmap_toggled", {"on": heatmap_on})
 
 
 func _on_sound() -> void:
-	Sfx.toggle()
+	open_settings()
+
+
+func open_settings() -> void:
+	# The sound button opens Settings (sliders and the sound toggle).
+	if settings.visible or help.visible or ended:
+		return
+	overlay_prev_speed = speed
+	_apply_speed(0.0)
+	modal = true
+	painting = false
+	settings.open()
+
+
+func _on_settings_closed() -> void:
+	modal = ended or light_panel.visible or sorter_panel.visible or help.visible \
+			or (intro != null and intro.visible)
+	if overlay_prev_speed > 0.0:
+		_apply_speed(overlay_prev_speed)
+	overlay_prev_speed = 0.0
 
 
 func open_help() -> void:
-	if help.visible or ended:
+	if help.visible or settings.visible or ended:
 		return
 	help_prev_speed = speed
 	_apply_speed(0.0)
@@ -323,7 +385,7 @@ func open_help() -> void:
 
 
 func _on_help_closed() -> void:
-	modal = ended or light_panel.visible or sorter_panel.visible
+	modal = ended or light_panel.visible or sorter_panel.visible or (intro != null and intro.visible)
 	if help_prev_speed > 0.0:
 		_apply_speed(help_prev_speed)
 	help_prev_speed = 0.0
@@ -397,9 +459,19 @@ func _on_key(code: int) -> void:
 		else:
 			open_help()
 		return
+	if code == KEY_G and goals_panel != null:
+		goals_panel.toggle()
+		return
+	if intro != null and intro.visible and (code == KEY_ENTER or code == KEY_KP_ENTER or code == KEY_SPACE):
+		intro.begin()
+		return
 	if code == KEY_ESCAPE:
-		if help.visible:
+		if settings.visible:
+			settings.close()
+		elif help.visible:
 			help.close()
+		elif intro != null and intro.visible:
+			go_menu()
 		elif confirm.visible:
 			confirm.visible = false
 		elif light_panel.visible or sorter_panel.visible:
@@ -471,9 +543,11 @@ func _drag_to(cell: Vector2) -> void:
 		_use_tool(last_cell + step, false)
 
 
-func _deny(msg: String) -> void:
+func _deny(msg: String, tool_id: int = -1) -> void:
 	hud.toast(msg)
-	Sfx.play("deny", 1.0, -4.0)
+	Sfx.play("invalid")
+	if tool_id != -1:
+		hud.flash_tool(tool_id)           # the count flashes red for a moment
 
 
 func _use_tool(cell: Vector2, is_click: bool) -> void:
@@ -486,19 +560,22 @@ func _use_tool(cell: Vector2, is_click: bool) -> void:
 			_open_panel(ctrl)
 		return
 	var built = false
-	var sound = "place"
+	var sound = "place_road"
 	if current_tool == C.Tool.ROAD:
 		built = sim.build_road(cell)
-		if not built and is_click and sim.inventory["road"] <= 0 and sim.grid.tile(cell) == C.Tile.EMPTY:
-			_deny(Strings.t("TOAST_NO_ITEMS"))
+		if not built and is_click:
+			if sim.inventory["road"] <= 0 and sim.grid.tile(cell) == C.Tile.EMPTY:
+				_deny(Strings.t("TOAST_NO_ITEMS"), C.Tool.ROAD)
+			elif sim.grid.tile(cell) != C.Tile.EMPTY or sim.grid.reserved.has(cell):
+				Sfx.play("invalid")        # a blocked tile
 	elif current_tool == C.Tool.BRIDGE:
-		sound = "bridge"
+		sound = "place_bridge"
 		built = sim.build_bridge(cell)
 		if not built and is_click:
 			if sim.grid.tile(cell) != C.Tile.WATER:
 				_deny(Strings.t("TOAST_NEED_WATER"))
 			elif sim.inventory["bridge"] <= 0:
-				_deny(Strings.t("TOAST_NO_ITEMS"))
+				_deny(Strings.t("TOAST_NO_ITEMS"), C.Tool.BRIDGE)
 	elif current_tool == C.Tool.LIGHT or current_tool == C.Tool.SORTER:
 		if not is_click:
 			return
@@ -506,9 +583,10 @@ func _use_tool(cell: Vector2, is_click: bool) -> void:
 		var placed = sim.place_light(cell) if kind == "light" else sim.place_sorter(cell)
 		if placed != null:
 			built = true
+			sound = "place_light" if kind == "light" else "place_sorter"
 			_open_panel(placed)
 		elif sim.inventory[kind] <= 0:
-			_deny(Strings.t("TOAST_NO_ITEMS"))
+			_deny(Strings.t("TOAST_NO_ITEMS"), current_tool)
 		else:
 			_deny(Strings.t("TOAST_NEED_JUNCTION"))
 	elif current_tool == C.Tool.ERASE:
@@ -519,7 +597,7 @@ func _use_tool(cell: Vector2, is_click: bool) -> void:
 			_tell_tutorial_changed()
 		return
 	if built:
-		Sfx.play(sound, 1.0 + randf() * 0.12)
+		Sfx.play(sound)
 		fx.add("pop", [cell], 0.3)
 		grid_view.update()
 		_tell_tutorial_changed()
@@ -533,6 +611,7 @@ func _tell_tutorial_changed() -> void:
 func _open_panel(ctrl) -> void:
 	painting = false
 	modal = true
+	Sfx.play("panel_open")
 	var where = sim.grid.label(ctrl.cell)
 	if ctrl.is_sorter:
 		sorter_panel.open(ctrl, sim.pathing.valid_dirs(sim.grid, ctrl.cell), where)
@@ -551,4 +630,5 @@ func _on_sorter_applied(cell, rules) -> void:
 
 
 func _on_panel_closed() -> void:
+	Sfx.play("panel_close")
 	modal = ended or help.visible

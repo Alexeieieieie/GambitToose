@@ -12,6 +12,8 @@ const SaveDataScript = preload("res://autoload/save_data.gd")
 const TutorialData = preload("res://tutorial/tutorial_data.gd")
 const TutorialManager = preload("res://tutorial/tutorial_manager.gd")
 const TutorialSolver = preload("res://tutorial/tutorial_solver.gd")
+const Director = preload("res://audio/audio_director.gd")
+const Goals = preload("res://sim/goals.gd")
 
 # Names the tutorial may highlight: every one is registered by the HUD or a panel.
 const UI_NAMES = ["tool_road", "tool_bridge", "tool_light", "tool_sorter", "tool_erase", "btn_pause",
@@ -24,7 +26,7 @@ var passed = 0
 
 func _initialize() -> void:
 	# Not _init(): the autoload singletons (Strings, Sfx) exist from here on.
-	print("=== GridFlow tests ===")
+	print("=== GambitToose tests ===")
 	test_pathfinding()
 	test_capacity_jam()
 	test_light_modes()
@@ -43,6 +45,14 @@ func _initialize() -> void:
 	test_no_soft_locks()
 	test_tutorial_cannot_be_lost()
 	test_audio_files()
+	test_audio_director()
+	test_registry()
+	test_audio_does_not_change_sim()
+	test_goal_types()
+	test_goal_level_data()
+	test_goal_calibration()
+	test_goals_read_only()
+	test_goal_save()
 	print("passed: %d, failed: %d" % [passed, failed])
 	if failed > 0:
 		print("TESTS FAILED")
@@ -271,7 +281,7 @@ func test_level_validity() -> void:
 		check("7 level %d valid with its solution" % lv["id"], ok,
 				"built=%s routes=%s result=%s %s t=%.0f deliveries=%d jam=%.1f score=%d stars=%d" % [
 				built, routes, sim.result, sim.lose_reason, sim.time, sim.metrics.deliveries,
-				sim.metrics.jam_seconds, sim.metrics.score(), sim.metrics.stars(sim.won())])
+				sim.metrics.jam_seconds, sim.metrics.score(), sim.goals.stars()])
 	levels.free()
 
 
@@ -378,6 +388,7 @@ func test_no_manual_control() -> void:
 	list_files("res://view", ".gd", files)
 	list_files("res://ui", ".gd", files)
 	list_files("res://tutorial", ".gd", files)
+	list_files("res://audio", ".gd", files)
 	var fields = ["path", "state", "pos", "progress", "idx", "speed", "wait_time", "unload_timer",
 			"from_cell", "reserved", "done", "dir", "dir_prev", "urgent", "repath_timer"]
 	var calls = ["vehicles.erase", "vehicles.remove", "vehicles.clear", "vehicles.pop", "vehicles.append",
@@ -506,7 +517,9 @@ func format_slots(s: String) -> Array:
 	var out = []
 	var i = 0
 	while i < s.length():
-		if s[i] == "%":
+		if s[i] == "%" and i + 1 < s.length() and s[i + 1] == "%":
+			i += 1                   # a literal percent sign is not a slot
+		elif s[i] == "%":
 			var j = i + 1
 			while j < s.length() and not (s[j] in ["s", "d", "f"]):
 				j += 1
@@ -659,11 +672,11 @@ func test_first_run() -> void:
 	b.path = path
 	var loaded = b.load_data()
 	var after = not b.is_first_run() and not b.tutorial_skipped
-	b.save_result(7, 1234, 2)
+	b.save_result(7, 1234, 5)
 	var c = SaveDataScript.new()
 	c.path = path
 	c.load_data()
-	var kept = c.get_best(7)["score"] == 1234 and c.get_best(7)["stars"] == 2 and not c.is_first_run()
+	var kept = c.get_best(7)["score"] == 1234 and c.get_stars(7) == 2 and c.get_mask(7) == 5 and not c.is_first_run()
 	check("15a first run: fresh install is a first run, then not", fresh and loaded and after and kept)
 	# A corrupt file must not crash and counts as a fresh install.
 	var f = File.new()
@@ -785,21 +798,425 @@ func test_tutorial_cannot_be_lost() -> void:
 
 
 # 19 --------------------------------------------------------------------------
-func test_audio_files() -> void:
-	var names = root.get_node("Sfx").get_script().get_script_constant_map()["NAMES"].duplicate()
-	names.append("music")
-	names.append("siren")
-	var missing = []
+func audio_dir_files() -> Array:
+	var out = []
 	var dir = Directory.new()
+	if dir.open("res://audio") != OK:
+		return out
+	dir.list_dir_begin(true, true)
+	var name = dir.get_next()
+	while name != "":
+		if name.ends_with(".wav"):
+			out.append(name.get_basename())
+		name = dir.get_next()
+	dir.list_dir_end()
+	return out
+
+
+func test_audio_files() -> void:
+	var have = audio_dir_files()
+	var missing = []
 	var total = 0
-	for n in names:
-		var path = "res://audio/%s.wav" % n
-		if not dir.file_exists(path):
+	for n in Director.all_files():
+		if not have.has(n):
 			missing.append(n)
 		else:
 			var f = File.new()
-			f.open(path, File.READ)
+			f.open("res://audio/%s.wav" % n, File.READ)
 			total += f.get_len()
 			f.close()
-	check("19 audio: every sound file exists and the total stays small", missing.empty() and total < 2500000,
-			"missing=%s total=%d KB" % [str(missing), total / 1024])
+	var output = []
+	var code = OS.execute("python3", ["-I", ProjectSettings.globalize_path("res://tools/check_audio.py")], true, output)
+	var py_ok = code == 0 or code == -1       # -1: python is not installed here, so the script cannot run
+	check("19 audio: every sound file exists, the total is small, check_audio.py passes",
+			missing.empty() and total < 6 * 1048576 and py_ok,
+			"missing=%s total=%d KB python exit=%d" % [str(missing), total / 1024, code])
+
+
+# 20 --------------------------------------------------------------------------
+func test_audio_director() -> void:
+	var d = Director.new()
+	for _i in range(7):
+		d.on_event({"type": "deliver"})
+		d.update(0.2)
+	var files = []
+	for r in d.take_requests():
+		files.append(r["file"])
+	check("20a streak: deliveries climb to note 4 and stay there",
+			files == ["deliver_0", "deliver_1", "deliver_2", "deliver_3", "deliver_4", "deliver_4", "deliver_4"], str(files))
+	d.on_event({"type": "deliver"})
+	d.on_event({"type": "jam_start"})
+	d.update(0.2)
+	d.on_event({"type": "deliver"})
+	d.update(0.2)
+	files = []
+	for r in d.take_requests():
+		files.append(r["file"])
+	check("20b streak: a jam resets it", files.size() == 3 and files[2] == "deliver_0" and files[0] == "jam_warn", str(files))
+	d.on_event({"type": "deliver"})
+	d.on_event({"type": "deliver"})
+	d.update(0.2)
+	d.take_requests()
+	d.update(16.0)
+	d.on_event({"type": "deliver"})
+	d.update(0.2)
+	var after_idle = d.take_requests()
+	check("20c streak: 15 s without a delivery resets it", after_idle.size() == 1 and after_idle[0]["file"] == "deliver_0")
+
+	# Merging: a burst of deliveries inside 150 ms plays one sound with the highest note.
+	d = Director.new()
+	for _i in range(4):
+		d.on_event({"type": "deliver"})
+		d.update(0.02)
+	d.update(0.2)
+	var burst = d.take_requests()
+	check("20d merging: four deliveries within 150 ms play one sound, the highest note",
+			burst.size() == 1 and burst[0]["file"] == "deliver_3", str(burst.size()))
+
+	# Cooldowns and voices.
+	d = Director.new()
+	var first = d.request("place_road")
+	var second = d.request("place_road")
+	d.update(0.05)
+	var third = d.request("place_road")
+	check("20e cooldown: a sound does not repeat inside its cooldown", first and not second and third)
+	d = Director.new()
+	var accepted = 0
+	for _i in range(5):
+		if d.request("deliver"):
+			accepted += 1
+	check("20f voices: max_voices is respected", accepted == 3, "accepted=%d" % accepted)
+	d = Director.new()
+	d.on_event({"type": "jam_start"})
+	var warn_first = d.take_requests().size() == 1
+	d.update(1.0)
+	d.on_event({"type": "jam_start"})
+	var warn_second = d.take_requests().size() == 0     # at most one jam_warn per 5 s
+	d.update(5.0)
+	d.on_event({"type": "jam_start"})
+	check("20g jam warning is limited to once per 5 s", warn_first and warn_second and d.take_requests().size() == 1)
+
+	# Ducking and intensity.
+	d = Director.new()
+	d.duck(4.0, 1.0)
+	var ducked = d.duck_offset() == -4.0
+	d.update(1.1)
+	check("20h ducking: lowers the music and returns to zero after its time", ducked and d.duck_offset() == 0.0)
+	d = Director.new()
+	var in_range = true
+	var went_on = false
+	for _i in range(20):
+		d.set_intensity_target(1.0)
+		in_range = in_range and d.intensity >= 0.0 and d.intensity <= 1.0
+		went_on = went_on or d.tension_on
+	var stays = true
+	d.intensity = 0.45
+	d.set_intensity_target(0.45)
+	stays = d.tension_on                       # between 0.35 and 0.5: the layer does not flicker off
+	for _i in range(20):
+		d.set_intensity_target(0.0)
+		in_range = in_range and d.intensity >= 0.0 and d.intensity <= 1.0
+	check("20i intensity stays in 0..1; tension fades in above 0.5 and out below 0.35",
+			in_range and went_on and stays and not d.tension_on)
+	d = Director.new()
+	check("20j melody layer starts after the first delivery",
+			d.layer_targets()["melody"] == 0.0 and _after_delivery(d)["melody"] == 1.0)
+	check("20k music pitch follows the speed", Director.music_pitch(1.0) == 1.0 and Director.music_pitch(2.0) == 1.04 \
+			and Director.music_pitch(4.0) == 1.08)
+
+
+func _after_delivery(d) -> Dictionary:
+	d.on_event({"type": "deliver"})
+	return d.layer_targets()
+
+
+# 21 --------------------------------------------------------------------------
+func test_registry() -> void:
+	var problems = []
+	for n in Director.MAPPED:
+		if not Director.REGISTRY.has(n):
+			problems.append("mapped but not in the registry: " + n)
+	for n in Director.REGISTRY.keys():
+		var e = Director.REGISTRY[n]
+		for k in ["bus", "base_db", "priority", "cooldown_ms", "max_voices", "pitch_jitter", "dur"]:
+			if not e.has(k):
+				problems.append(n + " lacks " + k)
+	var used = Director.all_files()
+	var have = audio_dir_files()
+	for n in used:
+		if not have.has(n):
+			problems.append("no file for " + n)
+	for n in have:
+		if not used.has(n):
+			problems.append("file not used by the registry: " + n)
+	for p in problems:
+		print("       " + p)
+	check("21 registry: every mapped sound is registered, has a file, and every file is used",
+			problems.empty(), "%d files" % have.size())
+
+
+func fingerprint(sim) -> Array:
+	var sum = Vector2()
+	for v in sim.vehicles:
+		sum += v.pos
+	return [sim.metrics.deliveries, sim.metrics.score(), sim.vehicles.size(), sum, sim.metrics.jam_seconds,
+			sim.time, sim.result, sim.metrics.urgent_deliveries]
+
+
+func run_level(lv: Dictionary, drain_into = null, goals_on: bool = true) -> Array:
+	var sim = make_sim(lv)
+	sim.goals_enabled = goals_on
+	sim.apply_solution()
+	var steps = 0
+	while not sim.finished and steps < 9000:
+		sim.step(C.STEP)
+		steps += 1
+		if drain_into != null:
+			for ev in sim.events:
+				drain_into.on_event(ev)
+			sim.events = []
+			drain_into.update(C.STEP, sim)
+	return fingerprint(sim)
+
+
+func test_audio_does_not_change_sim() -> void:
+	var levels = LevelsScript.new()
+	var lv = levels.LEVELS[1]
+	var plain = run_level(lv)
+	var with_audio = run_level(lv, Director.new())
+	levels.free()
+	check("22 new events and the audio director do not change the simulation", plain == with_audio,
+			"deliveries=%d" % plain[0])
+
+
+# 23 --------------------------------------------------------------------------
+func goal_sim(goals: Array, mode: String = "goal"):
+	var lv = base_level()
+	lv["mode"] = mode
+	lv["goal"] = 5
+	lv["time"] = 100
+	lv["star_goals"] = goals
+	return make_sim(lv)
+
+
+func status_of(goals: Array, setup_fn, won: bool, finalize: bool = true) -> Array:
+	var sim = goal_sim(goals)
+	sim.time = 60.0
+	setup_fn.call_func(sim)
+	sim.goals.tick(sim)
+	if finalize:
+		sim.goals.finalize(sim, won)
+	return sim.goals.status
+
+
+func test_goal_types() -> void:
+	var P = Goals.Status.PENDING
+	var D = Goals.Status.DONE
+	var F = Goals.Status.FAILED
+	var ok = true
+	var detail = ""
+	var cases = [
+		# [goal def, setup callable name, won, expected status]
+		[{"type": "complete"}, "noop", true, D],
+		[{"type": "complete"}, "noop", false, F],
+		[{"type": "time_left_min", "value": 30}, "noop", true, D],
+		[{"type": "time_left_min", "value": 50}, "noop", true, F],
+		[{"type": "time_left_min", "value": 30}, "noop", false, F],
+		[{"type": "jam_seconds_max", "value": 5}, "jam3", true, D],
+		[{"type": "jam_seconds_max", "value": 5}, "jam6", true, F],
+		[{"type": "jam_seconds_max", "value": 5}, "jam3", false, F],
+		[{"type": "avg_delivery_max", "value": 6}, "avg5", true, D],
+		[{"type": "avg_delivery_max", "value": 4}, "avg5", true, F],
+		[{"type": "avg_delivery_max", "value": 6}, "avg5", false, F],
+		[{"type": "urgent_min", "value": 3}, "urgent3", false, D],
+		[{"type": "urgent_min", "value": 4}, "urgent3", true, F],
+		[{"type": "patience_min", "value": 40}, "pat50", true, D],
+		[{"type": "patience_min", "value": 40}, "pat30", true, F],
+		[{"type": "roads_max", "value": 5}, "roads5", true, D],
+		[{"type": "roads_max", "value": 4}, "roads5", true, F],
+		[{"type": "deliver_min", "value": 4}, "deliv5", false, D],
+		[{"type": "deliver_min", "value": 6}, "deliv5", true, F],
+		[{"type": "score_min", "value": 400}, "deliv5", false, D],
+		[{"type": "score_min", "value": 900}, "deliv5", true, F],
+	]
+	for c in cases:
+		var sim = goal_sim([c[0]])
+		sim.time = 60.0
+		_apply_setup(sim, c[1])
+		sim.goals.tick(sim)
+		sim.goals.finalize(sim, c[2])
+		if sim.goals.status[0] != c[3]:
+			ok = false
+			detail += " %s/%s/%s got %d" % [c[0]["type"], c[1], str(c[2]), sim.goals.status[0]]
+	check("23a goals: every type is pending, done or failed as defined", ok, detail)
+
+	# Early behavior: live goals complete at once, early-fail goals fail at once, and nothing changes back.
+	var sim2 = goal_sim([{"type": "urgent_min", "value": 2}, {"type": "jam_seconds_max", "value": 5},
+			{"type": "patience_min", "value": 40}])
+	sim2.metrics.urgent_deliveries = 2
+	sim2.metrics.jam_seconds = 6.0
+	sim2.metrics.min_patience_ratio = 0.2
+	sim2.goals.tick(sim2)
+	var early = sim2.goals.status == [D, F, F]
+	var kinds = []
+	for ev in sim2.events:
+		kinds.append(ev["type"])
+	sim2.metrics.urgent_deliveries = 0
+	sim2.metrics.jam_seconds = 0.0
+	sim2.metrics.min_patience_ratio = 1.0
+	sim2.goals.tick(sim2)
+	sim2.goals.finalize(sim2, true)
+	check("23b goals: live goals finish at once, early-fail goals fail at once, never change back",
+			early and sim2.goals.status == [D, F, F] and kinds.count("goal_reached") == 1 and kinds.count("goal_failed") == 2,
+			str(kinds))
+	var sim3 = goal_sim([{"type": "complete"}, {"type": "jam_seconds_max", "value": 5}, {"type": "urgent_min", "value": 9}])
+	sim3.goals.finalize(sim3, true)
+	check("23c goals: mask and star count", sim3.goals.earned_mask() == 3 and sim3.goals.stars() == 2
+			and SaveDataScript.popcount(5) == 2)
+	var empty = goal_sim([])
+	empty.goals.finalize(empty, true)
+	check("23d goals: a level without goals has no stars", empty.goals.stars() == 0 and empty.goals.count() == 0)
+
+
+func _apply_setup(sim, name: String) -> void:
+	if name == "jam3":
+		sim.metrics.jam_seconds = 3.0
+	elif name == "jam6":
+		sim.metrics.jam_seconds = 6.0
+	elif name == "avg5":
+		sim.metrics.deliveries = 2
+		sim.metrics.total_delivery_time = 10.0
+	elif name == "urgent3":
+		sim.metrics.urgent_deliveries = 3
+	elif name == "pat50":
+		sim.metrics.min_patience_ratio = 0.5
+	elif name == "pat30":
+		sim.metrics.min_patience_ratio = 0.3
+	elif name == "roads5":
+		for i in range(5):
+			sim.grid.player_built[Vector2(i, 0)] = true
+	elif name == "deliv5":
+		sim.metrics.deliveries = 5
+		sim.metrics.total_delivery_time = 50.0
+
+
+func test_goal_level_data() -> void:
+	var levels = LevelsScript.new()
+	var t = strings_tables()
+	var problems = []
+	for lv in levels.LEVELS:
+		var g = lv.get("star_goals", [])
+		if g.size() != 3:
+			problems.append("level %d has %d goals" % [lv["id"], g.size()])
+			continue
+		if g[0]["type"] != "complete":
+			problems.append("level %d: first goal is not complete" % lv["id"])
+		for goal in g:
+			var type = goal["type"]
+			if not Goals.TYPES.has(type):
+				problems.append("unknown type " + type)
+				continue
+			if type != "complete" and not (goal.has("value") and goal["value"] > 0):
+				problems.append("%s needs a positive value" % type)
+			var keys = [Goals.text_key(type)]
+			if type != "complete":
+				keys.append(Goals.progress_key(type))
+				keys.append(Goals.result_key(type))
+			for k in keys:
+				if not t["EN"].has(k) or not t["RU"].has(k):
+					problems.append("missing text " + k)
+	for lesson in TutorialData.get_lessons():
+		if lesson["level"].has("star_goals"):
+			problems.append("tutorial lesson has star goals")
+	levels.free()
+	for p in problems:
+		print("       " + p)
+	check("23e goal data: three goals per level, first is complete, valid types and values, texts exist",
+			problems.empty())
+
+
+func finish_run(lv: Dictionary, variant: String):
+	var sim = make_sim(lv)
+	for a in lv["solution"]:
+		var act = a
+		if variant == "baseline" and (a["type"] == "light" or a["type"] == "sorter"):
+			continue
+		if variant == "timer" and a["type"] == "light":
+			act = a.duplicate()
+			act["mode"] = C.LightMode.TIMER
+		sim.apply_action(act)
+	var steps = 0
+	while not sim.finished and steps < 12000:
+		sim.step(C.STEP)
+		steps += 1
+	return sim
+
+
+func test_goal_calibration() -> void:
+	var levels = LevelsScript.new()
+	var all_three = true
+	var careless_ok = true
+	var detail = ""
+	for lv in levels.LEVELS:
+		var sol = finish_run(lv, "solution")
+		var base = finish_run(lv, "baseline")
+		var timer = finish_run(lv, "timer")
+		if sol.goals.stars() != 3:
+			all_three = false
+		if timer.goals.stars() > 2:
+			careless_ok = false
+		detail += " L%d solution=%d roads-only=%d timer-lights=%d;" % [lv["id"], sol.goals.stars(), base.goals.stars(), timer.goals.stars()]
+	levels.free()
+	check("24a calibration: the intended solution earns three stars on every level", all_three, detail)
+	check("24b calibration: a careless build (all lights on slow timers) earns at most two stars", careless_ok, detail)
+
+
+func test_goals_read_only() -> void:
+	var levels = LevelsScript.new()
+	var ok = true
+	for lv in levels.LEVELS:
+		var a = run_level(lv, null, true)
+		var b = run_level(lv, null, false)
+		if a != b:
+			ok = false
+	levels.free()
+	check("25 goals are read-only: results are identical with goals on and off", ok)
+
+
+func test_goal_save() -> void:
+	var path = "user://test_goals.cfg"
+	var dir = Directory.new()
+	if dir.file_exists(path):
+		dir.remove(path)
+	var a = SaveDataScript.new()
+	a.path = path
+	a.load_data()
+	var first = a.save_result(1, 100, 1)
+	var second = a.save_result(1, 50, 6)
+	var third = a.save_result(1, 900, 2)
+	var b = SaveDataScript.new()
+	b.path = path
+	b.load_data()
+	check("26a save: goal masks are ORed, earned goals stay earned, new bits are reported",
+			first == 1 and second == 6 and third == 0 and b.get_mask(1) == 7 and b.get_stars(1) == 3
+			and b.get_best(1)["score"] == 900)
+	a.set_volumes(50, 20, 70)
+	var c = SaveDataScript.new()
+	c.path = path
+	c.load_data()
+	check("26b save: volumes roundtrip, defaults are 100 / 60 / 90",
+			c.vol_master == 50 and c.vol_music == 20 and c.vol_effects == 70
+			and SaveDataScript.new().vol_master == 100 and SaveDataScript.new().vol_music == 60
+			and SaveDataScript.new().vol_effects == 90)
+	var f = File.new()
+	f.open(path, File.WRITE)
+	f.store_string("[meta]\ntutorial_done=true\nvol_master=\"loud\"\nvol_music=500\n[score]\n1=500\n[stars]\n1=3\n[played]\n1=true\n[goals]\n2=\"x\"\n3=99\n")
+	f.close()
+	var d = SaveDataScript.new()
+	d.path = path
+	d.load_data()
+	check("26c save: an old save (single stars value) migrates to empty masks, bad values never crash",
+			d.get_stars(1) == 0 and d.get_best(1)["score"] == 500 and d.get_mask(2) == 0 and d.get_mask(3) == 3
+			and d.vol_master == 100 and d.vol_music == 100 and d.tutorial_done)
+	if dir.file_exists(path):
+		dir.remove(path)

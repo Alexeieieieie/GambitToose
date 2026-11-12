@@ -39,9 +39,11 @@ func _ready() -> void:
 	card.add_child(title)
 	card.add_child(ThemeBuilder.label(Strings.t("SORTER_HELP"), Rect2(24, 52, 532, 24), 14, false, Palette.TEXT_DIM))
 	var cancel = ThemeBuilder.button(Strings.t("CANCEL"), Rect2(24, 348, 250, 52), 18)
+	Sfx.hover_hook(cancel)
 	cancel.connect("pressed", self, "_on_cancel")
 	card.add_child(cancel)
 	var apply = ThemeBuilder.button(Strings.t("APPLY"), Rect2(306, 348, 250, 52), 18)
+	Sfx.hover_hook(apply)
 	ThemeBuilder.paint(apply, Palette.YELLOW, Palette.NAVY)
 	apply.connect("pressed", self, "_on_apply")
 	card.add_child(apply)
@@ -68,6 +70,7 @@ func open(sorter, valid_dirs: Array, cell_label: String) -> void:
 	for row in rows:
 		var x = 170.0
 		var any = ThemeBuilder.button(Strings.t("ANY_DIR"), Rect2(x, y, 110, 56), 14)
+		Sfx.hover_hook(any)
 		any.connect("pressed", self, "_on_pick", [row[0], Vector2()])
 		card.add_child(any)
 		row_btns.append([row[0], Vector2(), any])
@@ -76,6 +79,7 @@ func open(sorter, valid_dirs: Array, cell_label: String) -> void:
 			if not valid.has(d):
 				continue
 			var b = ThemeBuilder.button("", Rect2(x, y, 56, 56), 14)
+			Sfx.hover_hook(b)
 			b.connect("pressed", self, "_on_pick", [row[0], d])
 			b.connect("draw", self, "_draw_arrow", [b, d])
 			card.add_child(b)
@@ -113,19 +117,19 @@ func _sync() -> void:
 
 
 func _on_pick(color, d) -> void:
-	Sfx.play("click", 1.0, -6.0)
+	Sfx.play("ui_click", 1.0, -6.0)
 	chosen[color] = d
 	_sync()
 
 
 func _on_apply() -> void:
-	Sfx.play("place")
+	Sfx.play("place_sorter")
 	visible = false
 	emit_signal("applied", cell, chosen)
 	emit_signal("closed")
 
 
 func _on_cancel() -> void:
-	Sfx.play("click", 1.0, -6.0)
+	Sfx.play("ui_click", 1.0, -6.0)
 	visible = false
 	emit_signal("closed")

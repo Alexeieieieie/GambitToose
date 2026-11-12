@@ -1,142 +1,368 @@
 extends Node
 
-# Sound effects pool and music. Everything is a local generated .wav file.
+# Plays sounds. The decisions (what, how loud, which note) come from audio/audio_director.gd;
+# this node owns the buses, the voice pool and the music players and executes the requests.
+# Everything is a local generated .wav file, loaded once at startup, never during play.
 
-const POOL_SIZE = 6
-const NAMES = ["deliver", "place", "bridge", "erase", "tick", "warn", "crash", "win", "lose", "click",
-		"step", "lesson", "fanfare", "deny", "speed"]
-# Semitone offsets of a major pentatonic ladder: deliveries in a row climb it.
-const LADDER = [0, 2, 4, 7, 9, 12, 14, 16]
-const MUSIC_DB = -9.0
-const MUSIC_DUCKED_DB = -18.0
+const Director = preload("res://audio/audio_director.gd")
+
+const POOL_SIZE = 10
+const BUSES = ["Music", "SFX", "UI", "Ambience"]
+const LAYERS = ["music_base", "music_melody", "music_tension"]
+const MUSIC_BUS_BASE_DB = 0.0
+const PAUSE_DUCK_DB = -6.0
+const LOWPASS_ON_HZ = 900.0
+const LOWPASS_OFF_HZ = 20000.0
+const DRIFT_LIMIT = 0.03
+const FADE_SECONDS = {"music_melody": 1.5, "music_tension": 1.0, "music_base": 0.8, "music_menu": 1.0}
 
 var enabled = true
+var director
+var rng = RandomNumberGenerator.new()      # only for pitch jitter, never the simulation's RNG
+
 var _streams = {}
-var _pool = []
-var _next = 0
-var _music
+var _pool = []                   # players
+var _pool_prio = []
+var _pool_started = []
+var _layers = {}                 # layer name -> AudioStreamPlayer
+var _level = {}                  # layer name -> current linear level 0..1
+var _menu_player
+var _menu_level = 0.0
+var _ambience
 var _siren
-var _deliver_streak = 0
-var _last_warn_msec = -100000
+var _siren_on = false
+var _siren_level = 0.0
+var _mode = "menu"               # "menu", "level" or "results"
+var _results_level = 1.0
+var _paused = false
+var _speed = 1.0
+var _lowpass_hz = LOWPASS_OFF_HZ
+var _lowpass_fx
+var _lowpass_index = -1
+var _drift_timer = 0.0
+var _vehicle_count = 0
+var _amb_level = 0.0
+var _sim
 
 
 func _ready() -> void:
 	pause_mode = Node.PAUSE_MODE_PROCESS
-	_ensure_bus("Music")
-	_ensure_bus("SFX")
-	for n in NAMES:
-		var s = _load_stream(n, false)
-		if s != null:
-			_streams[n] = s
+	rng.randomize()
+	director = Director.new()
+	_build_buses()
+	_load_all()
 	for _i in range(POOL_SIZE):
 		var p = AudioStreamPlayer.new()
-		p.bus = "SFX"
 		add_child(p)
 		_pool.append(p)
-	_music = AudioStreamPlayer.new()
-	_music.bus = "Music"
-	_music.volume_db = MUSIC_DB
-	_music.stream = _load_stream("music", true)
-	add_child(_music)
-	_siren = AudioStreamPlayer.new()
-	_siren.bus = "SFX"
-	_siren.volume_db = -14.0
-	_siren.stream = _load_stream("siren", true)
-	add_child(_siren)
+		_pool_prio.append(-1)
+		_pool_started.append(0)
+	for n in LAYERS:
+		_layers[n] = _make_loop_player(n, "Music")
+		_level[n] = 0.0
+	_menu_player = _make_loop_player("music_menu", "Music")
+	_ambience = _make_loop_player("ambience_traffic", "Ambience")
+	_siren = _make_loop_player("siren", "SFX")
+	apply_settings()
 	set_enabled(SaveData.sound_on, false)
-	if _music.stream != null:
-		_music.play()
+	start_menu_music()
 
 
-func _ensure_bus(bus_name: String) -> void:
-	if AudioServer.get_bus_index(bus_name) != -1:
+# ---------------------------------------------------------------- setup
+
+func _build_buses() -> void:
+	for bus_name in BUSES:
+		if AudioServer.get_bus_index(bus_name) == -1:
+			AudioServer.add_bus()
+			var i = AudioServer.get_bus_count() - 1
+			AudioServer.set_bus_name(i, bus_name)
+			AudioServer.set_bus_send(i, "Master")
+	AudioServer.set_bus_send(AudioServer.get_bus_index("Ambience"), "SFX")
+	var master_bus = AudioServer.get_bus_index("Master")
+	var limiter = AudioEffectLimiter.new()
+	limiter.ceiling_db = -1.0
+	limiter.threshold_db = -3.0
+	AudioServer.add_bus_effect(master_bus, limiter)
+	_lowpass_fx = AudioEffectLowPassFilter.new()
+	_lowpass_fx.cutoff_hz = LOWPASS_OFF_HZ
+	var music = AudioServer.get_bus_index("Music")
+	AudioServer.add_bus_effect(music, _lowpass_fx)
+	_lowpass_index = AudioServer.get_bus_effect_count(music) - 1
+	AudioServer.set_bus_effect_enabled(music, _lowpass_index, false)
+
+
+func _load_all() -> void:
+	for n in Director.all_files():
+		var path = "res://audio/" + n + ".wav"
+		if not ResourceLoader.exists(path):
+			continue
+		var s = load(path)
+		if s != null and n in Director.LOOP_FILES + Director.MUSIC_FILES and s is AudioStreamSample:
+			s.loop_mode = AudioStreamSample.LOOP_FORWARD
+			s.loop_begin = 0
+			s.loop_end = s.data.size() / 2   # 16-bit mono: two bytes per frame
+		_streams[n] = s
+
+
+func _make_loop_player(n: String, bus: String) -> AudioStreamPlayer:
+	var p = AudioStreamPlayer.new()
+	p.bus = bus
+	p.stream = _streams.get(n)
+	p.volume_db = -80.0
+	add_child(p)
+	return p
+
+
+# ---------------------------------------------------------------- settings
+
+func apply_settings() -> void:
+	_set_bus_linear("Master", SaveData.vol_master / 100.0)
+	_set_bus_linear("Music", SaveData.vol_music / 100.0)
+	_set_bus_linear("SFX", SaveData.vol_effects / 100.0)
+	_set_bus_linear("UI", SaveData.vol_effects / 100.0)
+
+
+func _set_bus_linear(bus_name: String, v: float) -> void:
+	var i = AudioServer.get_bus_index(bus_name)
+	if i == -1:
 		return
-	AudioServer.add_bus()
-	var i = AudioServer.get_bus_count() - 1
-	AudioServer.set_bus_name(i, bus_name)
-	AudioServer.set_bus_send(i, "Master")
-
-
-func _load_stream(n: String, loop: bool):
-	var path = "res://audio/" + n + ".wav"
-	if not ResourceLoader.exists(path):
-		return null
-	var s = load(path)
-	if s != null and loop and s is AudioStreamSample:
-		s.loop_mode = AudioStreamSample.LOOP_FORWARD
-		s.loop_begin = 0
-		s.loop_end = s.data.size() / 2   # 16-bit mono: two bytes per frame
-	return s
-
-
-func play(n: String, pitch: float = 1.0, volume_db: float = 0.0) -> void:
-	if not _streams.has(n):
-		return
-	var p = _pool[_next]
-	_next = (_next + 1) % POOL_SIZE
-	p.stream = _streams[n]
-	p.pitch_scale = pitch
-	p.volume_db = volume_db
-	p.play()
-
-
-func delivery_sound(during_jam: bool) -> void:
-	# The ding climbs a musical scale while deliveries arrive without a jam.
-	if during_jam:
-		_deliver_streak = 0
-	else:
-		_deliver_streak = int(min(_deliver_streak + 1, LADDER.size() - 1))
-	play("deliver", pow(2.0, LADDER[_deliver_streak] / 12.0), -4.0)
-
-
-func reset_streak() -> void:
-	_deliver_streak = 0
-
-
-func warn() -> void:
-	var now = OS.get_ticks_msec()
-	if now - _last_warn_msec < 5000:
-		return
-	_last_warn_msec = now
-	play("warn", 1.0, -3.0)
-
-
-func set_speed(speed: float) -> void:
-	if _music == null:
-		return
-	if speed >= 4.0:
-		_music.pitch_scale = 1.1
-	elif speed >= 2.0:
-		_music.pitch_scale = 1.05
-	else:
-		_music.pitch_scale = 1.0
-
-
-func duck(on: bool) -> void:
-	# Lowers the music under the results fanfare.
-	if _music != null:
-		_music.volume_db = MUSIC_DUCKED_DB if on else MUSIC_DB
-
-
-func set_siren(on: bool) -> void:
-	if _siren == null or _siren.stream == null:
-		return
-	if on and not _siren.playing:
-		_siren.play()
-	elif not on and _siren.playing:
-		_siren.stop()
+	AudioServer.set_bus_volume_db(i, linear2db(v) if v > 0.001 else -80.0)
 
 
 func set_enabled(on: bool, remember: bool = true) -> void:
 	enabled = on
 	if remember:
 		SaveData.set_sound(on)
-	for bus_name in ["Music", "SFX"]:
-		var i = AudioServer.get_bus_index(bus_name)
-		if i != -1:
-			AudioServer.set_bus_mute(i, not on)
+	AudioServer.set_bus_mute(AudioServer.get_bus_index("Master"), not on)
 
 
 func toggle() -> bool:
 	set_enabled(not enabled)
+	play("ui_toggle_on" if enabled else "ui_toggle_off")
 	return enabled
+
+
+# ---------------------------------------------------------------- one-shot sounds
+
+func play(n: String, pitch: float = 1.0, volume_db: float = 0.0) -> void:
+	# The single entry point for sounds. The director applies cooldowns and voice limits.
+	if director.request(n, volume_db, pitch):
+		_flush()
+
+
+func play_variant(n: String, variant: int, pitch: float = 1.0, volume_db: float = 0.0) -> void:
+	if director.request(n, volume_db, pitch, variant):
+		_flush()
+
+
+func handle_event(ev: Dictionary) -> void:
+	director.on_event(ev)
+	_flush()
+
+
+func _flush() -> void:
+	for r in director.take_requests():
+		_play_request(r)
+
+
+func _play_request(r: Dictionary) -> void:
+	var stream = _streams.get(r["file"])
+	if stream == null:
+		return
+	var idx = _pick_voice(int(r["priority"]))
+	if idx < 0:
+		return
+	var p = _pool[idx]
+	p.stream = stream
+	p.bus = r["bus"]
+	p.pitch_scale = r["pitch"] * (1.0 + (rng.randf() * 2.0 - 1.0) * r["jitter"])
+	p.volume_db = r["db"]
+	p.play()
+	_pool_prio[idx] = r["priority"]
+	_pool_started[idx] = OS.get_ticks_msec()
+
+
+func _pick_voice(priority: int) -> int:
+	# A free player, or steal the lowest-priority (then oldest) voice that is not more important.
+	var best = -1
+	for i in range(_pool.size()):
+		if not _pool[i].playing:
+			return i
+		if _pool_prio[i] <= priority:
+			if best == -1 or _pool_prio[i] < _pool_prio[best] \
+					or (_pool_prio[i] == _pool_prio[best] and _pool_started[i] < _pool_started[best]):
+				best = i
+	return best
+
+
+func delivery_streak() -> int:
+	return director.streak
+
+
+# ---------------------------------------------------------------- music and ambience
+
+func start_menu_music() -> void:
+	_mode = "menu"
+	_siren_on = false
+	_menu_level = 0.0
+	if _menu_player.stream != null and not _menu_player.playing:
+		_menu_player.play()
+	for n in LAYERS:
+		_level[n] = 0.0
+
+
+func start_level_audio(sim) -> void:
+	# The three layers start in the same frame so they stay aligned.
+	_mode = "level"
+	_sim = sim
+	_results_level = 1.0
+	_paused = false
+	_siren_on = false
+	director.reset()
+	for n in LAYERS:
+		_level[n] = 0.0
+		var p = _layers[n]
+		if p.stream != null:
+			p.volume_db = -80.0
+			p.play()
+	_level["music_base"] = 0.0
+	if not _ambience.playing and _ambience.stream != null:
+		_ambience.play()
+	_drift_timer = 0.0
+
+
+func results_started() -> void:
+	# Fades the layers out over a second; the results jingle plays over a ducked mix.
+	_mode = "results"
+	_siren_on = false
+	director.duck(8.0, 2.0)
+
+
+func set_speed(speed: float) -> void:
+	_speed = speed
+	var pitch = Director.music_pitch(speed)
+	for n in LAYERS:
+		_layers[n].pitch_scale = pitch
+	_menu_player.pitch_scale = 1.0
+
+
+func set_paused(paused: bool) -> void:
+	_paused = paused
+
+
+func set_siren(on: bool) -> void:
+	_siren_on = on
+
+
+func reset_streak() -> void:
+	director.streak = 0
+
+
+func duck(on: bool) -> void:
+	if on:
+		director.duck(8.0, 2.0)
+	else:
+		director.duck_db = 0.0
+		director.duck_until = 0.0
+
+
+func _process(delta: float) -> void:
+	director.update(delta, _sim if _mode == "level" else null)
+	_flush()
+	_update_music(delta)
+	_update_ambience(delta)
+	_update_lowpass(delta)
+	_drift_timer += delta
+	if _drift_timer >= 1.0:
+		_drift_timer = 0.0
+		_fix_drift()
+
+
+func _fade(current: float, target: float, seconds: float, delta: float) -> float:
+	var step = delta / max(seconds, 0.05)
+	if target > current:
+		return min(current + step, target)
+	return max(current - step, target)
+
+
+func _lin_db(v: float) -> float:
+	return linear2db(v) if v > 0.001 else -80.0
+
+
+func _update_music(delta: float) -> void:
+	var offset = director.duck_offset() + (PAUSE_DUCK_DB if _paused else 0.0)
+	var menu_target = 1.0 if _mode == "menu" else 0.0
+	_menu_level = _fade(_menu_level, menu_target, FADE_SECONDS["music_menu"], delta)
+	_menu_player.volume_db = _lin_db(_menu_level) + offset
+	if _menu_level <= 0.001 and _menu_player.playing and _mode != "menu":
+		_menu_player.stop()
+	if _mode == "menu":
+		for n in LAYERS:
+			_layers[n].volume_db = -80.0
+		return
+	var targets = director.layer_targets()
+	var fade_all = 1.0
+	if _mode == "results":
+		_results_level = _fade(_results_level, 0.0, 1.0, delta)
+		fade_all = _results_level
+	for n in LAYERS:
+		var key = n.replace("music_", "")
+		_level[n] = _fade(_level[n], targets[key], FADE_SECONDS[n], delta)
+		_layers[n].volume_db = _lin_db(_level[n] * fade_all) + offset
+
+
+func _update_ambience(delta: float) -> void:
+	var target = 0.0
+	if _mode == "level" and _sim != null and not _paused:
+		_vehicle_count = _sim.vehicles.size()
+		target = director.ambience_level(_vehicle_count)
+	_amb_level = _fade(_amb_level, target, 1.0, delta)
+	_ambience.volume_db = lerp(-60.0, -4.0, _amb_level) if _amb_level > 0.001 else -80.0
+	var siren_target = 1.0 if (_siren_on and _mode == "level" and not _paused) else 0.0
+	_siren_level = _fade(_siren_level, siren_target, 0.3, delta)
+	_siren.volume_db = _lin_db(_siren_level)
+	if _siren_level > 0.001 and not _siren.playing and _siren.stream != null:
+		_siren.play()
+	elif _siren_level <= 0.001 and _siren.playing:
+		_siren.stop()
+
+
+func _update_lowpass(delta: float) -> void:
+	var target = LOWPASS_ON_HZ if _paused else LOWPASS_OFF_HZ
+	var music = AudioServer.get_bus_index("Music")
+	if abs(_lowpass_hz - target) > 1.0:
+		# 0.2 s fade, in log frequency so it sounds even
+		var k = clamp(delta / 0.2, 0.0, 1.0)
+		_lowpass_hz = exp(lerp(log(_lowpass_hz), log(target), k))
+		_lowpass_fx.cutoff_hz = _lowpass_hz
+		AudioServer.set_bus_effect_enabled(music, _lowpass_index, true)
+	elif not _paused:
+		AudioServer.set_bus_effect_enabled(music, _lowpass_index, false)
+
+
+func _fix_drift() -> void:
+	# The layers must stay in sync: a layer more than 30 ms away from the base is restarted at the base position.
+	if _mode != "level":
+		return
+	var base = _layers["music_base"]
+	if not base.playing:
+		return
+	var pos = base.get_playback_position()
+	for n in ["music_melody", "music_tension"]:
+		var p = _layers[n]
+		if p.playing and abs(p.get_playback_position() - pos) > DRIFT_LIMIT:
+			p.play(pos)
+
+
+func layer_drift() -> float:
+	# For debugging and tests: the largest distance of a layer from the base, in seconds.
+	var base = _layers["music_base"]
+	var worst = 0.0
+	for n in ["music_melody", "music_tension"]:
+		worst = max(worst, abs(_layers[n].get_playback_position() - base.get_playback_position()))
+	return worst
+
+
+func hover_hook(b: Control) -> void:
+	# Hover tick for menu and panel buttons.
+	b.connect("mouse_entered", self, "play", ["ui_hover", 1.0, 0.0])

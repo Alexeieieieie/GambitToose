@@ -47,14 +47,14 @@ func _draw() -> void:
 
 
 func _on_start() -> void:
-	Sfx.play("click")
+	Sfx.play("ui_click")
 	Levels.mode = "tutorial"
 	Levels.tutorial_index = 0
 	get_tree().change_scene("res://view/game.tscn")
 
 
 func _on_skip() -> void:
-	Sfx.play("click", 1.0, -6.0)
+	Sfx.play("ui_click", 1.0, -6.0)
 	confirm.open()
 
 

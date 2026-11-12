@@ -269,6 +269,18 @@ func _run() -> void:
 	Levels.current = 0
 	yield(go("res://view/game.tscn"), "completed")
 	g = scene()
+	expect("the level intro card lists three goals and pauses the run",
+			g.intro != null and g.intro.visible and g.modal and g.speed == 0.0 and g.sim.goals.count() == 3)
+	yield(frames(5), "completed")
+	yield(shot("23a_level_intro"), "completed")
+	g.intro.begin()
+	yield(frames(5), "completed")
+	expect("Start closes the intro card", not g.modal and not g.intro.visible)
+	g.open_settings()
+	yield(frames(5), "completed")
+	yield(shot("23b_settings"), "completed")
+	expect("settings pause the run and close again", g.modal and g.speed == 0.0)
+	g.settings.close()
 	g.set_speed(4.0)
 	g.open_help()
 	yield(frames(8), "completed")
@@ -285,6 +297,37 @@ func _run() -> void:
 	yield(wait_real(2.0), "completed")
 	yield(shot("24_level_lost"), "completed")
 	expect("an empty Level 1 ends in a loss", g.sim.result == "lose")
+
+	# --- a winning run of Level 1 shows the goals while playing and the stars at the end
+	SaveData.goal_masks = {}
+	Levels.mode = "level"
+	Levels.current = 0
+	yield(go("res://view/game.tscn"), "completed")
+	g = scene()
+	g.intro.begin()
+	g.sim.apply_solution()
+	g.grid_view.update()
+	g.set_speed(4.0)
+	Engine.time_scale = 4.0
+	n = 0
+	while not g.sim.finished and n < 4000:
+		n += 1
+		if n == 60:
+			yield(shot("25a_goals_hud"), "completed")
+		yield(get_tree(), "idle_frame")
+	Engine.time_scale = 1.0
+	yield(wait_real(1.6), "completed")
+	yield(shot("25b_results_midway"), "completed")
+	yield(wait_real(2.6), "completed")
+	yield(shot("25c_results_win"), "completed")
+	expect("Level 1 solution wins", g.sim.result == "win")
+	expect("three goals earned and saved", g.sim.goals.stars() == 3 and SaveData.get_stars(1) == 3)
+	expect("results are visible", g.results.visible)
+	yield(go("res://ui/level_select.tscn"), "completed")
+	yield(frames(5), "completed")
+	yield(shot("25d_level_select"), "completed")
+	Levels.current = 0
+	yield(go("res://view/game.tscn"), "completed")
 
 	# --- restart five times: no growth in nodes
 	var counts = []
