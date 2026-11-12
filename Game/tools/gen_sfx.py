@@ -1,14 +1,4 @@
 #!/usr/bin/env python3
-"""Generates every sound of the game as 16-bit mono 22050 Hz WAV files.
-
-Standard library only, deterministic (fixed seeds), offline. Run:  python3 tools/gen_sfx.py
-Then check the result with:  python3 tools/check_audio.py
-
-Design rules: soft envelopes (attack >= 3 ms, release reaches exactly zero, plus a 5 ms
-fade-in and 10 ms fade-out on everything), warm tones (sine / triangle / band-limited soft
-saw), a small three-tap room for softness, tanh soft clipping, and loops that wrap their
-tails into their own start so the loop point has neither a gap nor a click.
-"""
 import math
 import os
 import random
@@ -19,8 +9,6 @@ SR = 22050
 TAU = 2.0 * math.pi
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "audio")
 
-# ---------------------------------------------------------------- loudness table
-# Peak targets in dBFS before bus gain. Tune the whole mix here.
 PEAK_DB = {
     "event": -6.0,
     "action": -6.0,
@@ -31,8 +19,8 @@ PEAK_DB = {
     "loop": -18.0,
     "music": -14.0,
 }
-RMS_TOLERANCE_DB = 2.0       # similar classes are pulled to within this of their median RMS
-PEAK_CEILING_DB = -1.0       # RMS matching never pushes a peak above this
+RMS_TOLERANCE_DB = 2.0
+PEAK_CEILING_DB = -1.0
 
 NOTE = {
     "C2": 65.41, "G2": 98.0, "A2": 110.0, "F2": 87.31,
@@ -44,28 +32,25 @@ NOTE = {
 }
 
 
-# ---------------------------------------------------------------- DSP helpers
 
 def n_of(seconds):
     return int(round(seconds * SR))
 
 
 def osc(kind, phase, width=0.5):
-    """One oscillator sample for a phase in cycles. All shapes are soft."""
     p = phase - math.floor(phase)
     if kind == "sine":
         return math.sin(TAU * p)
     if kind == "tri":
         return 4.0 * abs(p - 0.5) - 1.0
-    if kind == "saw":    # additive: six harmonics, decreasing amplitude
+    if kind == "saw":
         return sum(math.sin(TAU * k * p) / (k ** 1.6) for k in range(1, 7)) * 0.8
-    if kind == "pulse":  # soft pulse: a smoothed square of adjustable width
+    if kind == "pulse":
         return 0.55 * (math.sin(TAU * p) - math.sin(TAU * (p + (1.0 - width))))
     raise ValueError(kind)
 
 
 def adsr(n, a, d, s, r):
-    """Envelope of n samples. Attack >= 3 ms; release ends exactly at zero."""
     a_n = max(n_of(max(a, 0.003)), 1)
     d_n = max(n_of(d), 1)
     r_n = max(min(n_of(r), n - 1), 1)
@@ -85,7 +70,6 @@ def adsr(n, a, d, s, r):
 
 
 def decay_env(n, a, tau):
-    """Soft attack, exponential decay, forced to exactly zero at the end."""
     a_n = max(n_of(max(a, 0.003)), 1)
     out = []
     for i in range(n):
@@ -98,7 +82,6 @@ def decay_env(n, a, tau):
 
 
 def tone(freq, dur, kind="sine", env=None, f_end=None, amp=1.0, width=0.5, detune=0.0):
-    """A tone; `freq` may glide exponentially to `f_end`. `env` is a list or None (a soft ADSR)."""
     n = n_of(dur)
     if env is None:
         env = adsr(n, 0.01, 0.05, 0.7, min(0.08, dur * 0.5))
@@ -112,7 +95,6 @@ def tone(freq, dur, kind="sine", env=None, f_end=None, amp=1.0, width=0.5, detun
 
 
 def bell(freq, dur, amp=1.0, tau=0.12, harm2=0.25, harm3=0.0):
-    """Soft bell: a sine plus quiet harmonics under a decaying envelope."""
     n = n_of(dur)
     env = decay_env(n, 0.004, tau)
     out = []
@@ -130,7 +112,6 @@ def white(n, rng):
 
 
 def brown(n, rng):
-    """Brown noise: leaky-integrated white noise, normalized to +-1."""
     out = []
     v = 0.0
     for _ in range(n):
@@ -159,7 +140,6 @@ def bandpass(x, lo, hi):
 
 
 def sweep_noise(n, rng, f_from, f_to, q_mix=0.6):
-    """Noise through a two-pole low-pass whose cutoff glides from f_from to f_to (a soft swoosh)."""
     out = []
     y = 0.0
     z = 0.0
@@ -201,7 +181,6 @@ def place(buf, start, sig, wrap=False):
 
 
 def at(total, *parts):
-    """Lays (start_seconds, signal) parts into a buffer of `total` seconds."""
     buf = [0.0] * n_of(total)
     for start, sig in parts:
         place(buf, n_of(start), sig)
@@ -209,7 +188,6 @@ def at(total, *parts):
 
 
 def room(x, wet=0.22, cyclic=False):
-    """A tiny feedback-style room: three taps under 80 ms, for softness."""
     taps = [(n_of(0.023), 0.50), (n_of(0.047), 0.32), (n_of(0.071), 0.20)]
     out = list(x)
     n = len(x)
@@ -233,12 +211,11 @@ def peak_of(x):
 
 
 def finish(x, fade_in=0.005, fade_out=0.010):
-    """Fades that guarantee no click at either end."""
     x = list(x)
     fi = min(n_of(fade_in), len(x) // 2)
     fo = min(n_of(fade_out), len(x) // 2)
     for i in range(fi):
-        x[i] *= (i / fi) ** 2          # quadratic: the first 20 samples are practically silent
+        x[i] *= (i / fi) ** 2
     for i in range(fo):
         x[len(x) - 1 - i] *= (i / fo) ** 2
     if x:
@@ -247,7 +224,6 @@ def finish(x, fade_in=0.005, fade_out=0.010):
 
 
 def close_loop(x, xfade=0.05):
-    """Makes a steady sound loop: the last `xfade` seconds are crossfaded into the start."""
     k = n_of(xfade)
     n = len(x) - k
     out = x[:n]
@@ -274,7 +250,6 @@ def delayed(seconds, sig):
     return [0.0] * n_of(seconds) + sig
 
 
-# ---------------------------------------------------------------- the sounds
 
 def s_deliver(note):
     return room(bell(NOTE[note], 0.3, tau=0.09, harm2=0.18), 0.18)
@@ -418,7 +393,6 @@ def s_crash():
 
 
 def s_siren():
-    # Two-tone "wee-woo", 1 s loop, soft saw through a low-pass so it is never piercing.
     n = n_of(1.05)
     out = []
     ph = 0.0
@@ -459,7 +433,7 @@ def s_star(i):
 
 def s_win():
     parts = [(i * 0.2, bell(NOTE[nm], 0.55, tau=0.14, harm2=0.2)) for i, nm in enumerate(["C5", "E5", "G5", "C6"])]
-    for nm in ("E5", "G5", "C6"):          # bell harmony under the last note
+    for nm in ("E5", "G5", "C6"):
         parts.append((0.6, gain(bell(NOTE[nm], 0.6, tau=0.3, harm2=0.1), 0.45)))
     return room(at(1.2, *parts), 0.26)
 
@@ -487,7 +461,6 @@ def s_lesson_complete():
 
 
 def s_ambience():
-    # 8 s loop: brown noise through a low-pass plus a faint low engine hum, with a slow swell.
     rng = random.Random(112)
     n = n_of(8.5)
     rumble = lowpass(brown(n, rng), 320)
@@ -499,7 +472,6 @@ def s_ambience():
     return close_loop(out, 0.5)
 
 
-# ---------------------------------------------------------------- music
 
 def pad_note(freq, dur):
     n = n_of(dur)
@@ -519,13 +491,13 @@ def pluck(freq, dur=0.5, amp=1.0):
             + 0.3 * math.sin(TAU * 2 * freq * i / SR) * math.exp(-i / SR / 0.06)) for i in range(n)]
 
 
-CHORDS = {   # bass root, three pad notes, eight arpeggio notes (all pentatonic-friendly)
+CHORDS = {
     "C": ("C2", ["C4", "E4", "G4"], ["C5", "E5", "G5", "A5", "G5", "E5", "D5", "E5"]),
     "Am": ("A2", ["A3", "C4", "E4"], ["A4", "C5", "E5", "A5", "E5", "D5", "C5", "E5"]),
     "F": ("F2", ["F3", "A3", "C4"], ["C5", "D5", "E5", "G5", "E5", "D5", "C5", "A4"]),
     "G": ("G2", ["G3", "B3", "D4"], ["G4", "B4", "D5", "G5", "D5", "B4", "A4", "D5"]),
 }
-PROGRESSION = ["C", "Am", "F", "G", "C", "Am", "F", "G", "F", "G"]   # 10 bars at 100 BPM = 24 s
+PROGRESSION = ["C", "Am", "F", "G", "C", "Am", "F", "G", "F", "G"]
 
 
 def _geometry(bpm, bars):
@@ -563,26 +535,23 @@ def music_tension(bpm=100, bars=10, prog=PROGRESSION):
     minor_color = ["Eb4", "Bb3", "Ab4", "Eb5", "Bb4"]
     for b, name in enumerate(prog):
         root = NOTE[CHORDS[name][0]] * 2
-        for k in range(4):                       # a soft pulse on every beat
+        for k in range(4):
             n = n_of(beat * 0.5)
             place(buf, n_of(b * bar + k * beat),
                   tone(root, beat * 0.5, kind="tri", env=decay_env(n, 0.01, 0.12), amp=0.8), wrap=True)
-        if b % 2 == 1:                           # a few minor-colour notes
+        if b % 2 == 1:
             nm = minor_color[(b // 2) % len(minor_color)]
             place(buf, n_of(b * bar + 2.5 * beat), gain(pluck(NOTE[nm], 0.9), 0.55), wrap=True)
     return room(buf, 0.25, cyclic=True)
 
 
 def music_menu():
-    # Calmer and slower: 80 BPM, 8 bars = 24 s. The melody sits well under the pad.
     prog = ["C", "Am", "F", "G", "C", "Am", "F", "G"]
     return mix(music_base(80, 8, prog), gain(music_melody(80, 8, prog), 0.55))
 
 
-# ---------------------------------------------------------------- file list
 
 def sound_table():
-    """file name -> (class, builder, is_loop)."""
     t = {}
     for i, nm in enumerate(["C5", "D5", "E5", "G5", "A5"]):
         t["deliver_%d" % i] = ("event", (lambda nm=nm: s_deliver(nm)), False)
@@ -644,9 +613,8 @@ def main():
         if not is_loop:
             x = finish(x)
         elif cls == "music":
-            x = softclip(x, 1.2)          # loops keep their exact length: no fades
+            x = softclip(x, 1.2)
         built[name] = normalize(x, PEAK_DB[cls])
-    # Pull similar classes to within RMS_TOLERANCE_DB of their median RMS (peak stays under the ceiling).
     by_class = {}
     for name, (cls, _, is_loop) in table.items():
         if not is_loop:
@@ -660,7 +628,7 @@ def main():
             built[n] = gain(built[n], db_to_lin(min(diff, headroom)))
     for name, x in built.items():
         write_wav(os.path.join(OUT, name + ".wav"), x)
-    for f in os.listdir(OUT):             # remove files of the previous sound set
+    for f in os.listdir(OUT):
         if f.endswith(".wav") and f[:-4] not in built:
             os.remove(os.path.join(OUT, f))
             imp = os.path.join(OUT, f + ".import")

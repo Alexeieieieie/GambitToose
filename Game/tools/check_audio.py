@@ -1,8 +1,4 @@
 #!/usr/bin/env python3
-"""Checks every generated sound. Standard library only. Exit code 1 if anything is wrong.
-
-Run:  python3 tools/check_audio.py
-"""
 import math
 import os
 import struct
@@ -23,8 +19,8 @@ EXPECTED = (
 )
 PEAK_LIMIT_DB = -0.5
 EDGE_SAMPLES = 20
-EDGE_LIMIT = 0.02            # of full scale: a click risk above this
-SEAM_LIMIT = 0.05            # of full scale: loop first/last sample difference
+EDGE_LIMIT = 0.02
+SEAM_LIMIT = 0.05
 DC_LIMIT = 0.01
 MAX_TOTAL_BYTES = 6 * 1024 * 1024
 
