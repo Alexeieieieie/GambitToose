@@ -1,6 +1,5 @@
 extends Control
 
-# A small yes/no modal. Used to confirm skipping the tutorial.
 
 signal confirmed
 signal cancelled
@@ -16,24 +15,24 @@ func _ready() -> void:
 	rect_size = SCREEN
 	theme = ThemeBuilder.build()
 	visible = false
-	var dim = ColorRect.new()
-	dim.color = Palette.alpha(Palette.NAVY, 0.7)
-	dim.rect_size = SCREEN
-	dim.mouse_filter = Control.MOUSE_FILTER_STOP
-	add_child(dim)
-	var card = Panel.new()
-	card.rect_position = CARD.position
-	card.rect_size = CARD.size
-	card.add_stylebox_override("panel", ThemeBuilder.box(Palette.NAVY_MID, 18, 3, Palette.YELLOW))
-	add_child(card)
-	card.add_child(ThemeBuilder.label(Strings.t("SKIP_CONFIRM"), Rect2(28, 22, 444, 90), 20, true, Palette.WHITE, true))
-	var yes = ThemeBuilder.button(Strings.t("SKIP"), Rect2(28, 140, 210, 52), 18)
-	yes.connect("pressed", self, "_on_yes")
-	card.add_child(yes)
+	var a = ColorRect.new()
+	a.color = Palette.alpha(Palette.NAVY, 0.7)
+	a.rect_size = SCREEN
+	a.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(a)
+	var b = Panel.new()
+	b.rect_position = CARD.position
+	b.rect_size = CARD.size
+	b.add_stylebox_override("panel", ThemeBuilder.box(Palette.NAVY_MID, 18, 3, Palette.YELLOW))
+	add_child(b)
+	b.add_child(ThemeBuilder.label(Strings.t("SKIP_CONFIRM"), Rect2(28, 22, 444, 90), 20, true, Palette.WHITE, true))
+	var c = ThemeBuilder.button(Strings.t("SKIP"), Rect2(28, 140, 210, 52), 18)
+	c.connect("pressed", self, "_on_yes")
+	b.add_child(c)
 	var no = ThemeBuilder.button(Strings.t("GO_BACK"), Rect2(262, 140, 210, 52), 18)
 	ThemeBuilder.paint(no, Palette.YELLOW, Palette.NAVY)
 	no.connect("pressed", self, "_on_no")
-	card.add_child(no)
+	b.add_child(no)
 
 
 func open() -> void:

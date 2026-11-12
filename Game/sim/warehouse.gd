@@ -6,7 +6,7 @@ var cell = Vector2()
 var color = 0
 var patience = C.WAREHOUSE_PATIENCE_MAX
 var received = 0
-var low_flags = {}               # threshold percent -> already announced (observation only)
+var low_flags = {}
 
 
 func ratio() -> float:

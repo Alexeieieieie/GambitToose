@@ -1,6 +1,5 @@
 extends Control
 
-# The win or lose screen: title, stars, three stats, one concrete hint.
 
 signal restart_pressed
 signal next_pressed
@@ -14,16 +13,16 @@ const Goals = preload("res://sim/goals.gd")
 
 const SCREEN = Vector2(1280, 720)
 const CARD = Rect2(240, 50, 800, 620)
-const STAR_STEP = 0.6            # seconds between the stars
+const STAR_STEP = 0.6
 const STAR_START = 0.4
 
 var title_text = ""
 var stars = 0
-var goal_rows = []               # [text, result text, status, is_new]
+var goal_rows = []
 var sounded = {}
 var new_bits = 0
 var won = false
-var stats = []                   # [caption, value]
+var stats = []
 var hint_text = ""
 var score_text = ""
 var card
@@ -37,11 +36,11 @@ func _ready() -> void:
 	rect_size = SCREEN
 	theme = ThemeBuilder.build()
 	visible = false
-	var dim = ColorRect.new()
-	dim.color = Palette.alpha(Palette.NAVY, 0.7)
-	dim.rect_size = SCREEN
-	dim.mouse_filter = Control.MOUSE_FILTER_STOP
-	add_child(dim)
+	var a = ColorRect.new()
+	a.color = Palette.alpha(Palette.NAVY, 0.7)
+	a.rect_size = SCREEN
+	a.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(a)
 	card = Panel.new()
 	card.rect_position = CARD.position
 	card.rect_size = CARD.size
@@ -51,12 +50,12 @@ func _ready() -> void:
 	add_child(card)
 	hint_label = ThemeBuilder.label("", Rect2(50, 436, 700, 72), 17, true, Palette.NAVY, true)
 	card.add_child(hint_label)
-	var menu = ThemeBuilder.button(Strings.t("MENU"), Rect2(40, 538, 170, 56), 18)
-	menu.connect("pressed", self, "_on_menu")
-	card.add_child(menu)
-	var again = ThemeBuilder.button(Strings.t("RESTART"), Rect2(226, 538, 220, 56), 18)
-	again.connect("pressed", self, "_on_restart")
-	card.add_child(again)
+	var b = ThemeBuilder.button(Strings.t("MENU"), Rect2(40, 538, 170, 56), 18)
+	b.connect("pressed", self, "_on_menu")
+	card.add_child(b)
+	var e = ThemeBuilder.button(Strings.t("RESTART"), Rect2(226, 538, 220, 56), 18)
+	e.connect("pressed", self, "_on_restart")
+	card.add_child(e)
 	next_btn = ThemeBuilder.button(Strings.t("NEXT_LEVEL"), Rect2(462, 538, 298, 56), 18)
 	ThemeBuilder.paint(next_btn, Palette.YELLOW, Palette.NAVY)
 	next_btn.connect("pressed", self, "_on_next")
@@ -65,38 +64,38 @@ func _ready() -> void:
 	add_child(tween)
 
 
-func show_result(sim, has_next: bool, new_goal_bits: int = 0) -> void:
-	var m = sim.metrics
-	won = sim.won()
-	new_bits = new_goal_bits
-	stars = sim.goals.stars()
+func show_result(a, b: bool, e: int = 0) -> void:
+	var m = a.metrics
+	won = a.won()
+	new_bits = e
+	stars = a.goals.stars()
 	goal_rows = []
 	sounded = {}
-	for i in range(sim.goals.count()):
-		var type = sim.goals.type_of(i)
-		var text = Strings.t(Goals.text_key(type)) if type == "complete" else Strings.tf(Goals.text_key(type), [int(sim.goals.value_of(i))])
-		var res = "" if type == "complete" else Strings.tf(Goals.result_key(type), sim.goals.result_args(i, sim))
-		var done = sim.goals.status[i] == Goals.Status.DONE
-		goal_rows.append([text, res, sim.goals.status[i], done and (new_goal_bits & (1 << i)) != 0])
-	if sim.result == "win":
+	for i in range(a.goals.count()):
+		var h = a.goals.type_of(i)
+		var j = Strings.t(Goals.text_key(h)) if h == "complete" else Strings.tf(Goals.text_key(h), [int(a.goals.value_of(i))])
+		var k = "" if h == "complete" else Strings.tf(Goals.result_key(h), a.goals.result_args(i, a))
+		var l = a.goals.status[i] == Goals.Status.DONE
+		goal_rows.append([j, k, a.goals.status[i], l and (e & (1 << i)) != 0])
+	if a.result == "win":
 		title_text = Strings.t("WIN_TITLE")
-	elif sim.result == "finished":
+	elif a.result == "finished":
 		title_text = Strings.t("FINISH_TITLE")
-	elif sim.lose_reason == "patience":
+	elif a.lose_reason == "patience":
 		title_text = Strings.t("LOSE_PATIENCE")
-	elif sim.lose_reason == "time":
+	elif a.lose_reason == "time":
 		title_text = Strings.t("LOSE_TIME")
 	else:
 		title_text = Strings.t("LOSE_GRIDLOCK")
 	score_text = Strings.tf("SCORE", [m.score()])
 	stats = [
-		[Strings.t("DELIVERED"), str(m.deliveries) if sim.mode != "goal" else Strings.tf("PROGRESS", [m.deliveries, sim.goal])],
+		[Strings.t("DELIVERED"), str(m.deliveries) if a.mode != "goal" else Strings.tf("PROGRESS", [m.deliveries, a.goal])],
 		[Strings.t("AVG_DELIVERY"), Strings.tf("SECONDS", [m.avg_delivery_time()])],
 		[Strings.t("TIME_IN_JAMS"), Strings.tf("SECONDS", [m.jam_seconds])],
 	]
-	hint_text = make_hint(sim)
+	hint_text = make_hint(a)
 	hint_label.text = hint_text
-	next_btn.visible = has_next
+	next_btn.visible = b
 	next_btn.disabled = not won
 	if not won:
 		ThemeBuilder.paint(next_btn, Palette.STAR_OFF, Palette.NAVY_LIGHT)
@@ -107,81 +106,79 @@ func show_result(sim, has_next: bool, new_goal_bits: int = 0) -> void:
 	tween.start()
 
 
-func _near(sim, cell: Vector2, radius: int, what: String):
-	# Finds the closest light, junction or water tile around a cell.
-	var best = null
-	var best_d = 999.0
-	for y in range(-radius, radius + 1):
-		for x in range(-radius, radius + 1):
-			var c = cell + Vector2(x, y)
-			var hit = false
-			if what == "light":
-				var ctrl = sim.grid.controllers.get(c)
-				hit = ctrl != null and not ctrl.is_sorter
-			elif what == "junction":
-				hit = sim.grid.is_junction(c)
-			elif what == "water":
-				var t = sim.grid.tile(c)
-				hit = sim.grid.in_bounds(c) and (t == C.Tile.WATER or t == C.Tile.BRIDGE)
+func _near(a, b: Vector2, e: int, h: String):
+	var j = null
+	var k = 999.0
+	for y in range(-e, e + 1):
+		for x in range(-e, e + 1):
+			var c = b + Vector2(x, y)
+			var l = false
+			if h == "light":
+				var n = a.grid.controllers.get(c)
+				l = n != null and not n.is_sorter
+			elif h == "junction":
+				l = a.grid.is_junction(c)
+			elif h == "water":
+				var t = a.grid.tile(c)
+				l = a.grid.in_bounds(c) and (t == C.Tile.WATER or t == C.Tile.BRIDGE)
 			var d = abs(x) + abs(y)
-			if hit and d < best_d:
-				best_d = d
-				best = c
-	return best
+			if l and d < k:
+				k = d
+				j = c
+	return j
 
 
-func make_hint(sim) -> String:
-	var g = sim.grid
-	if sim.result == "lose" and sim.lose_reason == "patience" and sim.lose_cell != null:
+func make_hint(a) -> String:
+	var g = a.grid
+	if a.result == "lose" and a.lose_reason == "patience" and a.lose_cell != null:
 		return Strings.t("HINT_PATIENCE")
-	var worst = sim.metrics.worst_jam_cell()
-	if sim.result != "lose":
-		var bad = sim.goals.first_failed()
-		if bad == -1:
+	var b = a.metrics.worst_jam_cell()
+	if a.result != "lose":
+		var e = a.goals.first_failed()
+		if e == -1:
 			return Strings.t("HINT_PERFECT")
-		var type = sim.goals.type_of(bad)
-		if type == "time_left_min" or type == "avg_delivery_max":
+		var h = a.goals.type_of(e)
+		if h == "time_left_min" or h == "avg_delivery_max":
 			return Strings.t("HINT_G_FASTER")
-		if type == "urgent_min":
+		if h == "urgent_min":
 			return Strings.t("HINT_G_URGENT")
-		if type == "patience_min":
+		if h == "patience_min":
 			return Strings.t("HINT_G_PATIENCE")
-		if type == "roads_max":
+		if h == "roads_max":
 			return Strings.t("HINT_G_ROADS")
-		if type == "deliver_min" or type == "score_min":
+		if h == "deliver_min" or h == "score_min":
 			return Strings.t("HINT_G_SCORE")
-		# jam_seconds_max falls through to the jam location hint below
-	if sim.result == "lose" and sim.lose_reason == "gridlock":
-		var at = worst
-		if sim.last_deadlock.size() > 0:
-			at = sim.last_deadlock[0]
-		if at == null and sim.vehicles.size() > 0:
-			at = sim.vehicles[0].cell
+	if a.result == "lose" and a.lose_reason == "gridlock":
+		var at = b
+		if a.last_deadlock.size() > 0:
+			at = a.last_deadlock[0]
+		if at == null and a.vehicles.size() > 0:
+			at = a.vehicles[0].cell
 		if at != null:
 			return Strings.tf("HINT_GRIDLOCK", [g.label(at)])
 		return Strings.t("HINT_NO_JAM_LOSS")
-	if worst == null or sim.metrics.jam_seconds < 5.0:
-		if sim.result == "lose":
+	if b == null or a.metrics.jam_seconds < 5.0:
+		if a.result == "lose":
 			return Strings.t("HINT_TIME")
 		return Strings.t("HINT_CLEAN")
-	var where = g.label(worst)
-	var light_cell = _near(sim, worst, 5, "light")
-	if light_cell != null and g.controllers[light_cell].mode == C.LightMode.TIMER:
-		return Strings.tf("HINT_SENSOR", [where])
-	if light_cell == null and _near(sim, worst, 5, "junction") != null and sim.inventory["light"] > 0:
-		return Strings.tf("HINT_LIGHT", [where])
-	if _near(sim, worst, 3, "water") != null and sim.inventory["bridge"] > 0:
-		return Strings.tf("HINT_BRIDGE", [where])
-	if sim.inventory["sorter"] > 0:
-		return Strings.tf("HINT_SORTER", [where])
-	if sim.inventory["light"] > 0:
-		return Strings.tf("HINT_LIGHT", [where])
-	return Strings.tf("HINT_SORTER", [where])
+	var j = g.label(b)
+	var k = _near(a, b, 5, "light")
+	if k != null and g.controllers[k].mode == C.LightMode.TIMER:
+		return Strings.tf("HINT_SENSOR", [j])
+	if k == null and _near(a, b, 5, "junction") != null and a.inventory["light"] > 0:
+		return Strings.tf("HINT_LIGHT", [j])
+	if _near(a, b, 3, "water") != null and a.inventory["bridge"] > 0:
+		return Strings.tf("HINT_BRIDGE", [j])
+	if a.inventory["sorter"] > 0:
+		return Strings.tf("HINT_SORTER", [j])
+	if a.inventory["light"] > 0:
+		return Strings.tf("HINT_LIGHT", [j])
+	return Strings.tf("HINT_SORTER", [j])
 
 
-func _process(delta: float) -> void:
+func _process(a: float) -> void:
 	if visible:
-		age += delta
+		age += a
 		_star_sounds()
 		card.update()
 
@@ -191,44 +188,43 @@ func _star_time(i: int) -> float:
 
 
 func _star_sounds() -> void:
-	var earned = 0
+	var a = 0
 	for i in range(goal_rows.size()):
 		if goal_rows[i][2] != Goals.Status.DONE:
 			continue
-		earned += 1
+		a += 1
 		if age >= _star_time(i) and not sounded.has(i):
 			sounded[i] = true
-			Sfx.play("star_%d" % int(clamp(earned, 1, 3)))
+			Sfx.play("star_%d" % int(clamp(a, 1, 3)))
 
 
 func _draw_card() -> void:
 	var w = CARD.size.x
 	DrawUtil.centered(card, Fonts.make(42, true), Vector2(w / 2.0, 50), title_text,
 			Palette.NAVY if won else Palette.RED_DARK)
-	# Stars appear one by one, 0.6 s apart. An earned star is gold, an unearned one is gray with an outline.
 	for i in range(3):
 		var c = Vector2(w / 2.0 + (i - 1) * 100.0, 118 - (8 if i == 1 else 0))
-		var shown = age >= _star_time(i)
-		var got = i < goal_rows.size() and goal_rows[i][2] == Goals.Status.DONE
+		var a = age >= _star_time(i)
+		var b = i < goal_rows.size() and goal_rows[i][2] == Goals.Status.DONE
 		DrawUtil.star(card, c, 38.0, Palette.NAVY)
-		var grow = 1.0
-		if shown and got:
-			grow = 1.0 + 0.3 * max(0.0, 1.0 - (age - _star_time(i)) * 4.0)
-		DrawUtil.star(card, c, 31.0 * grow, Palette.YELLOW if (shown and got) else Palette.STAR_OFF)
+		var e = 1.0
+		if a and b:
+			e = 1.0 + 0.3 * max(0.0, 1.0 - (age - _star_time(i)) * 4.0)
+		DrawUtil.star(card, c, 31.0 * e, Palette.YELLOW if (a and b) else Palette.STAR_OFF)
 	DrawUtil.centered(card, Fonts.make(22, true), Vector2(w / 2.0, 176), score_text, Palette.NAVY)
 	var f = Fonts.make(17, false)
 	var fb = Fonts.make(17, true)
 	for i in range(goal_rows.size()):
-		var row = goal_rows[i]
+		var h = goal_rows[i]
 		var y = 200.0 + i * 42.0
 		card.draw_style_box(ThemeBuilder.box(Palette.alpha(Palette.NAVY, 0.1), 12), Rect2(40, y, 720, 38))
-		var state = row[2] if age >= _star_time(i) else GoalIcon.PENDING
-		GoalIcon.draw(card, Vector2(66, y + 19), 13.0, state, Palette.CARD)
-		DrawUtil.left(card, f, Vector2(92, y + 19), row[0], Palette.NAVY)
-		if row[1] != "":
-			var rw = f.get_string_size(row[1]).x
-			DrawUtil.left(card, f, Vector2(676 - rw, y + 19), row[1], Palette.NAVY_LIGHT)
-		if row[3] and age >= _star_time(i):
+		var j = h[2] if age >= _star_time(i) else GoalIcon.PENDING
+		GoalIcon.draw(card, Vector2(66, y + 19), 13.0, j, Palette.CARD)
+		DrawUtil.left(card, f, Vector2(92, y + 19), h[0], Palette.NAVY)
+		if h[1] != "":
+			var rw = f.get_string_size(h[1]).x
+			DrawUtil.left(card, f, Vector2(676 - rw, y + 19), h[1], Palette.NAVY_LIGHT)
+		if h[3] and age >= _star_time(i):
 			card.draw_style_box(ThemeBuilder.box(Palette.YELLOW, 10), Rect2(684, y + 6, 66, 26))
 			DrawUtil.centered(card, fb, Vector2(717, y + 19), Strings.t("NEW_BADGE"), Palette.NAVY)
 	for i in range(stats.size()):

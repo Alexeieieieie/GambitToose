@@ -1,6 +1,5 @@
 extends Control
 
-# One-page quick reference, opened with the ? button or F1. Pauses the game while open.
 
 signal closed
 
@@ -19,35 +18,35 @@ func _ready() -> void:
 	rect_size = SCREEN
 	theme = ThemeBuilder.build()
 	visible = false
-	var dim = ColorRect.new()
-	dim.color = Palette.alpha(Palette.NAVY, 0.72)
-	dim.rect_size = SCREEN
-	dim.mouse_filter = Control.MOUSE_FILTER_STOP
-	add_child(dim)
+	var a = ColorRect.new()
+	a.color = Palette.alpha(Palette.NAVY, 0.72)
+	a.rect_size = SCREEN
+	a.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(a)
 	var f = Fonts.make(16, false)
-	var text_w = 660.0
+	var b = 660.0
 	var y = 74.0
-	var rows = []
+	var c = []
 	for s in SECTIONS:
-		var h = DrawUtil.wrap_lines(f, Strings.t(s[1]), text_w) * (f.get_height() + 3) + 6
-		rows.append([s, y, max(h, 26.0)])
+		var h = DrawUtil.wrap_lines(f, Strings.t(s[1]), b) * (f.get_height() + 3) + 6
+		c.append([s, y, max(h, 26.0)])
 		y += max(h, 26.0) + 14.0
-	var foot_h = DrawUtil.wrap_lines(Fonts.make(18, true), Strings.t("HELP_FOOT"), 812.0) * 27.0
-	var height = y + foot_h + 90.0
+	var d = DrawUtil.wrap_lines(Fonts.make(18, true), Strings.t("HELP_FOOT"), 812.0) * 27.0
+	var e = y + d + 90.0
 	card = Panel.new()
-	card.rect_position = Vector2((SCREEN.x - 860.0) / 2.0, (SCREEN.y - height) / 2.0)
-	card.rect_size = Vector2(860, height)
+	card.rect_position = Vector2((SCREEN.x - 860.0) / 2.0, (SCREEN.y - e) / 2.0)
+	card.rect_size = Vector2(860, e)
 	card.add_stylebox_override("panel", ThemeBuilder.box(Palette.NAVY_MID, 20, 3, Palette.YELLOW))
 	add_child(card)
 	card.add_child(ThemeBuilder.label(Strings.t("HELP_TITLE"), Rect2(24, 14, 812, 40), 26, true, Palette.YELLOW))
-	for r in rows:
+	for r in c:
 		card.add_child(ThemeBuilder.label(Strings.t(r[0][0]), Rect2(24, r[1], 150, 26), 16, true, Palette.YELLOW))
-		var l = ThemeBuilder.label(Strings.t(r[0][1]), Rect2(176, r[1], text_w, r[2]), 16, false, Palette.WHITE)
+		var l = ThemeBuilder.label(Strings.t(r[0][1]), Rect2(176, r[1], b, r[2]), 16, false, Palette.WHITE)
 		l.valign = Label.VALIGN_TOP
 		l.add_constant_override("line_spacing", 3)
 		card.add_child(l)
-	card.add_child(ThemeBuilder.label(Strings.t("HELP_FOOT"), Rect2(24, y + 2, 812, foot_h), 18, true, Palette.WHITE, true))
-	close_btn = ThemeBuilder.button(Strings.t("CLOSE"), Rect2(330, height - 64, 200, 46), 18)
+	card.add_child(ThemeBuilder.label(Strings.t("HELP_FOOT"), Rect2(24, y + 2, 812, d), 18, true, Palette.WHITE, true))
+	close_btn = ThemeBuilder.button(Strings.t("CLOSE"), Rect2(330, e - 64, 200, 46), 18)
 	ThemeBuilder.paint(close_btn, Palette.YELLOW, Palette.NAVY)
 	close_btn.connect("pressed", self, "close")
 	card.add_child(close_btn)

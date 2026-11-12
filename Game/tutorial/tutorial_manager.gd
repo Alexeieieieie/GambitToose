@@ -1,7 +1,5 @@
 extends Reference
 
-# Runs one tutorial lesson. No scene-tree dependencies: it reads the simulation and is told
-# about player actions through notify(). The coach panel and highlight layer only draw it.
 
 const C = preload("res://sim/constants.gd")
 
@@ -12,8 +10,8 @@ signal tutorial_finished
 const SUPPORTED = ["continue", "road_connected", "bridge_placed", "light_placed", "light_mode_set",
 		"sorter_placed", "sorter_rule_set", "speed_started", "speed_set", "heatmap_toggled",
 		"delivered_count", "urgent_delivered", "crash", "level_won", "level_lost"]
-const HINT_AFTER = 15.0          # real seconds before the Hint button appears
-const SKIP_AFTER = 30.0          # real seconds before the Skip step link appears
+const HINT_AFTER = 15.0
+const SKIP_AFTER = 30.0
 const CHECK_INTERVAL = 0.25
 const STUCK_SECONDS = 8.0
 
@@ -21,7 +19,7 @@ var lesson = {}
 var steps = []
 var idx = 0
 var sim
-var state = {}                   # facts set by events: continue, speed, heatmap, ...
+var state = {}
 var step_time = 0.0
 var check_timer = 0.0
 var done = false
@@ -31,12 +29,12 @@ var lesson_count = 6
 var broken = false
 
 
-func start(lesson_: Dictionary, sim_, number: int = 1, total: int = 6) -> void:
-	lesson = lesson_
+func start(a: Dictionary, b, c: int = 1, d: int = 6) -> void:
+	lesson = a
 	steps = lesson["steps"]
-	sim = sim_
-	lesson_no = number
-	lesson_count = total
+	sim = b
+	lesson_no = c
+	lesson_count = d
 	idx = 0
 	done = false
 	state = {"speed": 0.0, "heatmap": false}
@@ -63,28 +61,28 @@ func is_info_step() -> bool:
 	return current_wait() == "continue"
 
 
-func notify(event: String, data: Dictionary = {}) -> void:
+func notify(a: String, b: Dictionary = {}) -> void:
 	if done:
 		return
-	if event == "continue":
+	if a == "continue":
 		if current_wait() == "continue":
 			state["continue"] = true
-	elif event == "speed_set":
-		state["speed"] = float(data.get("value", 0.0))
-	elif event == "speed_started":
+	elif a == "speed_set":
+		state["speed"] = float(b.get("value", 0.0))
+	elif a == "speed_started":
 		state["speed_started"] = true
-	elif event == "heatmap_toggled":
-		state["heatmap"] = bool(data.get("on", false))
-	elif event == "crash":
+	elif a == "heatmap_toggled":
+		state["heatmap"] = bool(b.get("on", false))
+	elif a == "crash":
 		state["crash"] = true
 	_check()
 
 
-func tick(real_dt: float) -> void:
+func tick(a: float) -> void:
 	if done:
 		return
-	step_time += real_dt
-	check_timer += real_dt
+	step_time += a
+	check_timer += a
 	if check_timer >= CHECK_INTERVAL:
 		check_timer = 0.0
 		_check()
@@ -119,19 +117,17 @@ func highlights() -> Dictionary:
 
 
 func checklist() -> Array:
-	# [[text key, done], ...] for the current step.
-	var out = []
-	for item in current_step().get("checklist", []):
-		out.append([item["key"], _met(item["cond"])])
-	return out
+	var a = []
+	for b in current_step().get("checklist", []):
+		a.append([b["key"], _met(b["cond"])])
+	return a
 
 
-# ------------------------------------------------------------------ internals
 
 func _check() -> void:
-	var guard = 0
-	while not done and guard <= steps.size():
-		guard += 1
+	var a = 0
+	while not done and a <= steps.size():
+		a += 1
 		if not _met(current_step()["wait"]):
 			break
 		_advance()
@@ -200,9 +196,9 @@ func _met(w: Dictionary) -> bool:
 	return false
 
 
-func _connected(color: int) -> bool:
+func _connected(a: int) -> bool:
 	for f in sim.factories:
-		if f.color == color:
+		if f.color == a:
 			return sim.has_route(f)
 	return false
 
@@ -210,13 +206,13 @@ func _connected(color: int) -> bool:
 func _bridges_ok(w: Dictionary) -> bool:
 	var g = sim.grid
 	if w.has("cells"):
-		for cell in w["cells"]:
-			if g.tile(cell) != C.Tile.BRIDGE:
+		for a in w["cells"]:
+			if g.tile(a) != C.Tile.BRIDGE:
 				return false
 		return true
 	var n = 0
-	for cell in g.road_cells:
-		if g.tile(cell) == C.Tile.BRIDGE:
+	for a in g.road_cells:
+		if g.tile(a) == C.Tile.BRIDGE:
 			n += 1
 	return n >= int(w.get("count", 1))
 

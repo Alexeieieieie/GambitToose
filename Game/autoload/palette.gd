@@ -1,6 +1,5 @@
 extends Node
 
-# Every color of the game.
 
 const NAVY = Color("#1F2340")
 const NAVY_LIGHT = Color("#3B4070")
@@ -39,19 +38,18 @@ const LIGHT_OFF = Color("#3A3F5C")
 const STAR_OFF = Color("#C9CCDA")
 
 
-func cargo(color: int) -> Color:
-	# Matches C.CargoColor: BLUE, RED, URGENT.
-	if color == 0:
+func cargo(d: int) -> Color:
+	if d == 0:
 		return BLUE
-	if color == 1:
+	if d == 1:
 		return RED
 	return URGENT
 
 
-func cargo_dark(color: int) -> Color:
-	if color == 0:
+func cargo_dark(d: int) -> Color:
+	if d == 0:
 		return BLUE_DARK
-	if color == 1:
+	if d == 1:
 		return RED_DARK
 	return URGENT_DARK
 

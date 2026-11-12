@@ -1,7 +1,5 @@
 extends Reference
 
-# The whole simulation. Runs without a scene tree: call step(dt) at a fixed rate.
-# Things that happened are pushed onto `events` as dictionaries; the view drains them.
 
 const C = preload("res://sim/constants.gd")
 const Grid = preload("res://sim/grid.gd")
@@ -18,7 +16,7 @@ var level = {}
 var grid
 var pathing
 var metrics
-var goals                        # star goals: a read-only observer
+var goals
 var goals_enabled = true
 var rng = RandomNumberGenerator.new()
 
@@ -28,24 +26,24 @@ var warehouses = []
 var lights = []
 var sorters = []
 var inventory = {"road": 0, "light": 0, "sorter": 0, "bridge": 0}
-var pending_events = []          # spawn events not yet triggered
-var events = []                  # drained by the view every frame
+var pending_events = []
+var events = []
 
 var time = 0.0
 var time_limit = 0.0
 var goal = 0
 var mode = "goal"
 var finished = false
-var lose_enabled = true          # false in tutorial lessons: nothing can be lost
-var lesson = false               # tutorial lesson: the run never ends by itself
-var urgent_next = {}             # tutorial hook: cargo color -> next truck is urgent
-var result = ""                  # "win", "lose", "finished"
-var lose_reason = ""             # "patience", "gridlock", "time"
+var lose_enabled = true
+var lesson = false
+var urgent_next = {}
+var result = ""
+var lose_reason = ""
 var lose_cell = null
 
-var density = {}                 # Vector2 -> smoothed occupancy 0..1
-var still_time = 0.0             # seconds without any vehicle moving
-var risk_mark = -1               # last whole second a gridlock_risk event was pushed for
+var density = {}
+var still_time = 0.0
+var risk_mark = -1
 var jam_active = false
 var crash_done = false
 var weight_timer = 0.0
@@ -70,15 +68,15 @@ func load_level(lv: Dictionary) -> void:
 	lesson = lv.get("lesson", false)
 	grid.track_conflicts = lv.get("force_crash", false)
 	grid.hold_for_crash = grid.track_conflicts
-	var inv = lv.get("inventory", {})
-	for key in ["road", "light", "sorter", "bridge"]:
-		inventory[key] = int(inv.get(key, 0))
-	for cell in lv.get("water", []):
-		grid.tiles[cell] = C.Tile.WATER
-	for cell in lv.get("obstacles", []):
-		grid.tiles[cell] = C.Tile.OBSTACLE
-	for cell in lv.get("roads", []):
-		grid.tiles[cell] = C.Tile.ROAD      # pre-built, not erasable
+	var c = lv.get("inventory", {})
+	for e in ["road", "light", "sorter", "bridge"]:
+		inventory[e] = int(c.get(e, 0))
+	for g in lv.get("water", []):
+		grid.tiles[g] = C.Tile.WATER
+	for g in lv.get("obstacles", []):
+		grid.tiles[g] = C.Tile.OBSTACLE
+	for g in lv.get("roads", []):
+		grid.tiles[g] = C.Tile.ROAD
 	for f in lv.get("factories", []):
 		_add_factory(f)
 	for w in lv.get("warehouses", []):
@@ -96,21 +94,20 @@ func load_level(lv: Dictionary) -> void:
 
 
 func _apply_prebuilt(a: Dictionary) -> void:
-	# Level pieces that exist from the start: not erasable and free of charge.
-	var kind = a["type"]
-	if kind == "road_line":
-		var from = a["from"]
+	var c = a["type"]
+	if c == "road_line":
+		var e = a["from"]
 		var to = a["to"]
-		var d = Vector2(sign(to.x - from.x), sign(to.y - from.y))
-		var cell = from
+		var d = Vector2(sign(to.x - e.x), sign(to.y - e.y))
+		var g = e
 		while true:
-			grid.tiles[cell] = C.Tile.ROAD
-			if cell == to:
+			grid.tiles[g] = C.Tile.ROAD
+			if g == to:
 				break
-			cell += d
-	elif kind == "road":
+			g += d
+	elif c == "road":
 		grid.tiles[a["cell"]] = C.Tile.ROAD
-	elif kind == "light":
+	elif c == "light":
 		var l = Intersection.new()
 		l.cell = a["cell"]
 		l.mode = a.get("mode", C.LightMode.TIMER)
@@ -142,153 +139,148 @@ func _add_warehouse(d: Dictionary) -> void:
 	grid.reserved.erase(w.cell)
 
 
-# ---------------------------------------------------------------- build commands
-# These are the only things the player can do. None of them touches a vehicle,
-# except erase(), which removes vehicles standing on a road that disappears.
 
-func can_build_road(cell: Vector2) -> bool:
-	return grid.in_bounds(cell) and grid.tile(cell) == C.Tile.EMPTY \
-			and not grid.reserved.has(cell) and inventory["road"] > 0
+func can_build_road(c: Vector2) -> bool:
+	return grid.in_bounds(c) and grid.tile(c) == C.Tile.EMPTY \
+			and not grid.reserved.has(c) and inventory["road"] > 0
 
 
-func build_road(cell: Vector2) -> bool:
-	if not can_build_road(cell):
+func build_road(c: Vector2) -> bool:
+	if not can_build_road(c):
 		return false
-	grid.tiles[cell] = C.Tile.ROAD
-	grid.player_built[cell] = true
+	grid.tiles[c] = C.Tile.ROAD
+	grid.player_built[c] = true
 	inventory["road"] -= 1
 	grid.mark_dirty()
 	return true
 
 
-func can_build_bridge(cell: Vector2) -> bool:
-	return grid.in_bounds(cell) and grid.tile(cell) == C.Tile.WATER and inventory["bridge"] > 0
+func can_build_bridge(c: Vector2) -> bool:
+	return grid.in_bounds(c) and grid.tile(c) == C.Tile.WATER and inventory["bridge"] > 0
 
 
-func build_bridge(cell: Vector2) -> bool:
-	if not can_build_bridge(cell):
+func build_bridge(c: Vector2) -> bool:
+	if not can_build_bridge(c):
 		return false
-	grid.tiles[cell] = C.Tile.BRIDGE
-	grid.player_built[cell] = true
+	grid.tiles[c] = C.Tile.BRIDGE
+	grid.player_built[c] = true
 	inventory["bridge"] -= 1
 	grid.mark_dirty()
 	return true
 
 
-func can_place_controller(cell: Vector2, kind: String) -> bool:
-	return grid.is_junction(cell) and not grid.controllers.has(cell) and inventory[kind] > 0
+func can_place_controller(c: Vector2, e: String) -> bool:
+	return grid.is_junction(c) and not grid.controllers.has(c) and inventory[e] > 0
 
 
-func place_light(cell: Vector2):
-	if not can_place_controller(cell, "light"):
+func place_light(c: Vector2):
+	if not can_place_controller(c, "light"):
 		return null
 	var l = Intersection.new()
-	l.cell = cell
-	grid.controllers[cell] = l
+	l.cell = c
+	grid.controllers[c] = l
 	lights.append(l)
 	inventory["light"] -= 1
 	grid.mark_dirty()
 	return l
 
 
-func place_sorter(cell: Vector2):
-	if not can_place_controller(cell, "sorter"):
+func place_sorter(c: Vector2):
+	if not can_place_controller(c, "sorter"):
 		return null
 	var s = Sorter.new()
-	s.cell = cell
-	grid.controllers[cell] = s
+	s.cell = c
+	grid.controllers[c] = s
 	sorters.append(s)
 	inventory["sorter"] -= 1
 	grid.mark_dirty()
 	return s
 
 
-func configure_light(cell: Vector2, mode_: int, period: float, threshold: int, urgent_first: bool) -> bool:
-	var l = grid.controllers.get(cell)
+func configure_light(c: Vector2, e: int, g: float, h: int, j: bool) -> bool:
+	var l = grid.controllers.get(c)
 	if l == null or l.is_sorter:
 		return false
-	l.mode = mode_
-	l.period = period
-	l.threshold = threshold
-	l.urgent_first = urgent_first
+	l.mode = e
+	l.period = g
+	l.threshold = h
+	l.urgent_first = j
 	return true
 
 
-func configure_sorter(cell: Vector2, rules: Dictionary) -> bool:
-	var s = grid.controllers.get(cell)
+func configure_sorter(c: Vector2, e: Dictionary) -> bool:
+	var s = grid.controllers.get(c)
 	if s == null or not s.is_sorter:
 		return false
-	for key in rules.keys():
-		s.rules[key] = rules[key]
+	for g in e.keys():
+		s.rules[g] = e[g]
 	grid.mark_dirty()
 	return true
 
 
-func can_erase(cell: Vector2) -> bool:
-	return grid.controllers.has(cell) or grid.player_built.has(cell)
+func can_erase(c: Vector2) -> bool:
+	return grid.controllers.has(c) or grid.player_built.has(c)
 
 
-func erase(cell: Vector2) -> String:
-	# Returns what was removed: "light", "sorter", "road", "bridge" or "".
-	var ctrl = grid.controllers.get(cell)
-	if ctrl != null:
-		grid.controllers.erase(cell)
-		var kind = "sorter" if ctrl.is_sorter else "light"
-		if ctrl.is_sorter:
-			sorters.erase(ctrl)
+func erase(c: Vector2) -> String:
+	var e = grid.controllers.get(c)
+	if e != null:
+		grid.controllers.erase(c)
+		var g = "sorter" if e.is_sorter else "light"
+		if e.is_sorter:
+			sorters.erase(e)
 		else:
-			lights.erase(ctrl)
-		inventory[kind] += 1
+			lights.erase(e)
+		inventory[g] += 1
 		grid.mark_dirty()
-		return kind
-	if not grid.player_built.has(cell):
+		return g
+	if not grid.player_built.has(c):
 		return ""
-	var was_bridge = grid.tile(cell) == C.Tile.BRIDGE
-	for v in grid.occupants[cell].duplicate():
-		_drop_vehicle(v)         # the road under it disappeared
-	grid.tiles[cell] = C.Tile.WATER if was_bridge else C.Tile.EMPTY
-	grid.player_built.erase(cell)
-	var what = "bridge" if was_bridge else "road"
-	inventory[what] += 1
+	var h = grid.tile(c) == C.Tile.BRIDGE
+	for v in grid.occupants[c].duplicate():
+		_drop_vehicle(v)
+	grid.tiles[c] = C.Tile.WATER if h else C.Tile.EMPTY
+	grid.player_built.erase(c)
+	var j = "bridge" if h else "road"
+	inventory[j] += 1
 	grid.mark_dirty()
-	return what
+	return j
 
 
 func apply_action(a: Dictionary) -> bool:
-	# Build actions used by level solutions and tests.
-	var kind = a["type"]
-	if kind == "road_line":
-		var from = a["from"]
+	var c = a["type"]
+	if c == "road_line":
+		var e = a["from"]
 		var to = a["to"]
-		var d = Vector2(sign(to.x - from.x), sign(to.y - from.y))
-		var cell = from
+		var d = Vector2(sign(to.x - e.x), sign(to.y - e.y))
+		var g = e
 		var ok = true
 		while true:
-			if grid.tile(cell) == C.Tile.EMPTY:
-				ok = build_road(cell) and ok
-			if cell == to:
+			if grid.tile(g) == C.Tile.EMPTY:
+				ok = build_road(g) and ok
+			if g == to:
 				break
-			cell += d
+			g += d
 		return ok
-	if kind == "road":
+	if c == "road":
 		return build_road(a["cell"])
-	if kind == "bridge":
+	if c == "bridge":
 		return build_bridge(a["cell"])
-	if kind == "light":
+	if c == "light":
 		if place_light(a["cell"]) == null:
 			return false
 		return configure_light(a["cell"], a.get("mode", C.LightMode.SENSOR),
 				a.get("period", C.DEFAULT_PERIOD), a.get("threshold", C.DEFAULT_THRESHOLD),
 				a.get("urgent_first", false))
-	if kind == "sorter":
+	if c == "sorter":
 		if place_sorter(a["cell"]) == null:
 			return false
 		return configure_sorter(a["cell"], a.get("rules", {}))
-	if kind == "configure_light":
+	if c == "configure_light":
 		return configure_light(a["cell"], a.get("mode", C.LightMode.SENSOR),
 				a.get("period", C.DEFAULT_PERIOD), a.get("threshold", C.DEFAULT_THRESHOLD),
 				a.get("urgent_first", false))
-	if kind == "erase":
+	if c == "erase":
 		return erase(a["cell"]) != ""
 	return false
 
@@ -300,20 +292,19 @@ func apply_solution() -> bool:
 	return ok
 
 
-# ---------------------------------------------------------------- queries
 
-func is_warehouse_for(cell: Vector2, color: int) -> bool:
-	if grid.tile(cell) != C.Tile.WAREHOUSE:
+func is_warehouse_for(c: Vector2, e: int) -> bool:
+	if grid.tile(c) != C.Tile.WAREHOUSE:
 		return false
 	for w in warehouses:
-		if w.cell == cell:
-			return w.color == color
+		if w.cell == c:
+			return w.color == e
 	return false
 
 
-func color_active(color: int) -> bool:
+func color_active(c: int) -> bool:
 	for f in factories:
-		if f.color == color and time >= f.start_at:
+		if f.color == c and time >= f.start_at:
 			return true
 	return false
 
@@ -328,17 +319,16 @@ func time_left() -> float:
 	return max(time_limit - time, 0.0)
 
 
-# ---------------------------------------------------------------- vehicles
 
-func spawn_vehicle(f, path: Array, urgent: bool) -> void:
+func spawn_vehicle(f, c: Array, e: bool) -> void:
 	var v = Vehicle.new()
 	v.color = f.color
-	v.urgent = urgent
-	v.speed = C.SPEED_URGENT if urgent else C.SPEED_NORMAL
-	v.path = path
-	v.cell = path[0]
+	v.urgent = e
+	v.speed = C.SPEED_URGENT if e else C.SPEED_NORMAL
+	v.path = c
+	v.cell = c[0]
 	v.pos = grid.center(v.cell)
-	v.dir = path[1] - path[0]
+	v.dir = c[1] - c[0]
 	v.dir_prev = v.dir
 	v.spawn_time = time
 	v.repath_timer = C.REPATH_URGENT_INTERVAL
@@ -369,8 +359,8 @@ func _drop_vehicle(v) -> void:
 
 
 func _repath(v) -> bool:
-	var start = v.next_cell() if v.reserved else v.cell
-	var p = pathing.find_path(v.route_class(), start, v.color, warehouses)
+	var c = v.next_cell() if v.reserved else v.cell
+	var p = pathing.find_path(v.route_class(), c, v.color, warehouses)
 	if p.empty():
 		return false
 	if v.reserved:
@@ -395,15 +385,13 @@ func _revalidate_paths() -> void:
 			continue
 		if v.state == Vehicle.S.STRANDED or _path_broken(v):
 			if not _repath(v):
-				# No way out: stop at the end of the tile it is committed to.
-				var keep = [v.cell]
+				var c = [v.cell]
 				if v.reserved:
-					keep.append(v.next_cell())
-				v.path = keep
+					c.append(v.next_cell())
+				v.path = c
 				v.idx = 0
 
 
-# ---------------------------------------------------------------- the step
 
 func step(dt: float) -> void:
 	if finished:
@@ -419,9 +407,9 @@ func step(dt: float) -> void:
 		f.tick(dt, self)
 	_update_sensors()
 	for l in lights:
-		var before = l.green_axis
+		var c = l.green_axis
 		l.tick(dt)
-		if l.green_axis != before:
+		if l.green_axis != c:
 			events.append({"type": "light_switch", "cell": l.cell})
 	_tick_vehicles(dt)
 	_tick_warehouses(dt)
@@ -451,49 +439,48 @@ func _run_spawn_events() -> void:
 	while pending_events.size() > 0 and time >= float(pending_events[0]["at"]):
 		var ev = pending_events[0]
 		pending_events.remove(0)
-		var cells = []
+		var c = []
 		for f in ev.get("factories", []):
 			var d = f.duplicate()
 			d["start_at"] = time + float(f.get("delay", 3.0))
 			_add_factory(d)
-			cells.append(d["cell"])
+			c.append(d["cell"])
 		for w in ev.get("warehouses", []):
 			_add_warehouse(w)
-			cells.append(w["cell"])
+			c.append(w["cell"])
 		grid.mark_dirty()
 		pathing.rebuild(grid)
-		events.append({"type": "new_building", "cells": cells})
+		events.append({"type": "new_building", "cells": c})
 
 
 func _update_sensors() -> void:
-	# Each light measures the queue of waiting vehicles on its four approaches.
 	for l in lights:
 		l.waiting[0] = 0
 		l.waiting[1] = 0
 		l.urgent_waiting[0] = false
 		l.urgent_waiting[1] = false
 		for d in C.DIRS:
-			var axis = 0 if d.y == 0 else 1
-			var prev = l.cell
-			var cur = l.cell + d
+			var c = 0 if d.y == 0 else 1
+			var e = l.cell
+			var g = l.cell + d
 			var n = 0
-			while n < C.SENSOR_RANGE and grid.is_passable(cur):
-				var found = false
-				for v in grid.occupants[cur]:
-					if v.cell == cur and v.state == Vehicle.S.WAITING and v.next_cell() == prev:
-						found = true
-						l.waiting[axis] += 1
+			while n < C.SENSOR_RANGE and grid.is_passable(g):
+				var h = false
+				for v in grid.occupants[g]:
+					if v.cell == g and v.state == Vehicle.S.WAITING and v.next_cell() == e:
+						h = true
+						l.waiting[c] += 1
 						if v.urgent:
-							l.urgent_waiting[axis] = true
-				if not found:
+							l.urgent_waiting[c] = true
+				if not h:
 					break
-				prev = cur
-				cur += d
+				e = g
+				g += d
 				n += 1
 
 
 func _tick_vehicles(dt: float) -> void:
-	var any_done = false
+	var c = false
 	for v in vehicles:
 		if v.urgent and v.state != Vehicle.S.UNLOADING:
 			v.repath_timer -= dt
@@ -502,15 +489,15 @@ func _tick_vehicles(dt: float) -> void:
 				_repath(v)
 		v.tick(dt, self)
 		if v.done:
-			any_done = true
-	if any_done:
-		var keep = []
+			c = true
+	if c:
+		var e = []
 		for v in vehicles:
 			if v.done:
 				grid.occupants[v.cell].erase(v)
 			else:
-				keep.append(v)
-		vehicles = keep
+				e.append(v)
+		vehicles = e
 
 
 func _tick_warehouses(dt: float) -> void:
@@ -521,107 +508,104 @@ func _tick_warehouses(dt: float) -> void:
 		_observe_patience(w)
 		if not lose_enabled:
 			if w.patience <= 1.0:
-				w.patience = C.WAREHOUSE_PATIENCE_MAX   # tutorial: the bar clamps and refills
+				w.patience = C.WAREHOUSE_PATIENCE_MAX
 			continue
 		if w.patience <= 0.0 and not finished:
 			_finish("lose", "patience", w.cell)
 
 
 func _observe_patience(w) -> void:
-	# Read-only bookkeeping: the lowest ratio so far, and one warning per threshold.
 	var r = w.ratio()
 	if r < metrics.min_patience_ratio:
 		metrics.min_patience_ratio = r
-	for pct in C.PATIENCE_LOW_PERCENT:
-		if r * 100.0 < pct:
-			if not w.low_flags.get(pct, false):
-				w.low_flags[pct] = true
-				events.append({"type": "patience_low", "cell": w.cell, "threshold": pct})
+	for c in C.PATIENCE_LOW_PERCENT:
+		if r * 100.0 < c:
+			if not w.low_flags.get(c, false):
+				w.low_flags[c] = true
+				events.append({"type": "patience_low", "cell": w.cell, "threshold": c})
 		elif r * 100.0 >= C.PATIENCE_REARM_PERCENT:
-			w.low_flags[pct] = false
+			w.low_flags[c] = false
 
 
 func _tick_jams(dt: float) -> void:
-	var jam = false
+	var c = false
 	for v in vehicles:
 		if (v.state == Vehicle.S.WAITING or v.state == Vehicle.S.STRANDED) and v.wait_time > C.JAM_WAIT:
-			jam = true
+			c = true
 			metrics.add_jam_cell(v.cell, dt)
-	if jam:
+	if c:
 		metrics.jam_seconds += dt
-	if jam and not jam_active:
+	if c and not jam_active:
 		events.append({"type": "jam_start"})
-	elif jam_active and not jam:
+	elif jam_active and not c:
 		events.append({"type": "jam_end"})
-	jam_active = jam
+	jam_active = c
 
 
 func _tick_gridlock(dt: float) -> void:
-	var moving = false
+	var c = false
 	for v in vehicles:
 		if v.moved:
-			moving = true
+			c = true
 			break
-	if moving or vehicles.size() < C.GRIDLOCK_MIN_VEHICLES:
+	if c or vehicles.size() < C.GRIDLOCK_MIN_VEHICLES:
 		still_time = 0.0
 		risk_mark = -1
 		return
 	still_time += dt
 	if still_time >= C.GRIDLOCK_RISK_SECONDS and int(still_time) != risk_mark:
-		risk_mark = int(still_time)      # once per second while frozen (read-only observation)
+		risk_mark = int(still_time)
 		events.append({"type": "gridlock_risk", "seconds": int(still_time)})
 	if still_time >= C.GRIDLOCK_SECONDS and not finished and lose_enabled:
 		_finish("lose", "gridlock", null)
 
 
 func _refresh_density() -> void:
-	for cell in grid.road_cells:
-		var now = float(grid.occupants[cell].size()) / grid.capacity(cell)
-		density[cell] = lerp(density.get(cell, 0.0), min(now, 1.0), 0.2)
+	for c in grid.road_cells:
+		var e = float(grid.occupants[c].size()) / grid.capacity(c)
+		density[c] = lerp(density.get(c, 0.0), min(e, 1.0), 0.2)
 
 
 func _blocker_of(v):
-	# The waiting vehicle that keeps `v` out of its next tile, or null.
 	var to = v.next_cell()
 	if not grid.occupants.has(to):
 		return null
-	var is_j = grid.is_junction(to)
+	var c = grid.is_junction(to)
 	for o in grid.occupants[to]:
 		if o.cell != to or o.state != Vehicle.S.WAITING:
 			continue
-		if is_j or o.from_cell == v.cell:
+		if c or o.from_cell == v.cell:
 			return o
 	return null
 
 
 func _check_deadlock() -> void:
-	# Wait-for graph: every waiting vehicle points at the vehicle blocking it.
-	var wait_for = {}
+	var c = {}
 	for v in vehicles:
 		if v.state == Vehicle.S.WAITING:
 			var b = _blocker_of(v)
 			if b != null:
-				wait_for[v] = b
-	var visited = {}
+				c[v] = b
+	var e = {}
 	for v in vehicles:
-		if not wait_for.has(v) or visited.has(v):
+		if not c.has(v) or e.has(v):
 			continue
-		var chain = []
-		var on_chain = {}
-		var cur = v
-		while cur != null and wait_for.has(cur) and not visited.has(cur):
-			visited[cur] = true
-			on_chain[cur] = chain.size()
-			chain.append(cur)
-			cur = wait_for[cur]
-		if cur != null and on_chain.has(cur):
-			var cells = []
-			for i in range(on_chain[cur], chain.size()):
-				cells.append(chain[i].cell)
-			last_deadlock = cells
+		var g = []
+		var h = {}
+		var j = v
+		while j != null and c.has(j) and not e.has(j):
+			e[j] = true
+			h[j] = g.size()
+			g.append(j)
+			j = c[j]
+		if j != null and h.has(j):
+			var k = []
+			for i in range(h[j], g.size()):
+				k.append(g[i].cell)
+			last_deadlock = k
 			if deadlock_cooldown <= 0.0:
 				deadlock_cooldown = 2.0
-				events.append({"type": "deadlock_cycle", "cells": cells})
+				events.append({"type": "deadlock_cycle", "cells": k})
 			return
 	last_deadlock = []
 
@@ -638,14 +622,14 @@ func _check_end() -> void:
 			_finish("lose", "time", null)
 
 
-func _finish(res: String, reason: String, cell) -> void:
+func _finish(c: String, e: String, g) -> void:
 	finished = true
-	result = res
-	lose_reason = reason
-	lose_cell = cell
+	result = c
+	lose_reason = e
+	lose_cell = g
 	if goals_enabled:
 		goals.finalize(self, won())
-	events.append({"type": "finished", "result": res, "reason": reason})
+	events.append({"type": "finished", "result": c, "reason": e})
 
 
 func won() -> bool:

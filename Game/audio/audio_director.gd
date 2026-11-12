@@ -1,12 +1,9 @@
 extends Reference
 
-# Decides WHAT to play. No scene tree, no audio devices: it takes simulation events and
-# game state and produces sound requests and target music layer levels, so it is testable
-# headless. Autoload Sfx executes the requests. It only observes; it never touches sim state.
 
 const C = preload("res://sim/constants.gd")
 
-const DELIVER_MERGE_WINDOW = 0.15    # deliveries closer than this play as one sound
+const DELIVER_MERGE_WINDOW = 0.15
 const STREAK_RESET_SECONDS = 15.0
 const MAX_NOTE = 4
 const INTENSITY_INTERVAL = 0.5
@@ -14,7 +11,6 @@ const TENSION_ON = 0.5
 const TENSION_OFF = 0.35
 const COUNTDOWN_FROM = 10
 
-# bus, base_db, priority (higher survives), cooldown_ms, max_voices, pitch_jitter, dur (seconds), files
 const REGISTRY = {
 	"deliver": {"bus": "SFX", "base_db": 0.0, "priority": 3, "cooldown_ms": 0, "max_voices": 3, "pitch_jitter": 0.0, "dur": 0.3,
 			"files": ["deliver_0", "deliver_1", "deliver_2", "deliver_3", "deliver_4"]},
@@ -54,39 +50,38 @@ const REGISTRY = {
 const LOOP_FILES = ["siren", "ambience_traffic"]
 const MUSIC_FILES = ["music_base", "music_melody", "music_tension", "music_menu"]
 
-# Every sound name the event mapping may request (checked against REGISTRY by the tests).
 const MAPPED = ["deliver", "jam_warn", "gridlock_warn", "patience_low", "crash", "light_switch",
 		"goal_reached", "goal_failed", "countdown_tick"]
 
-var clock = 0.0                  # director time in seconds (real time, advanced by update)
-var streak = 0                   # index of the next delivery note, 0..MAX_NOTE
+var clock = 0.0
+var streak = 0
 var last_delivery = -1000.0
-var intensity = 0.0              # 0..1, smoothed
+var intensity = 0.0
 var tension_on = false
 var melody_on = false
 var duck_db = 0.0
 var duck_until = 0.0
-var requests = []                # drained by the player with take_requests()
+var requests = []
 
-var _pending_note = -1           # a delivery waiting out the merge window
+var _pending_note = -1
 var _pending_at = 0.0
-var _last_played = {}            # sound -> clock of the last play
-var _voices = {}                 # sound -> end times of the voices still sounding
+var _last_played = {}
+var _voices = {}
 var _intensity_timer = 0.0
 var _countdown_mark = -1
 
 
 static func all_files() -> Array:
-	var out = []
-	for name in REGISTRY.keys():
-		var e = REGISTRY[name]
+	var a = []
+	for b in REGISTRY.keys():
+		var e = REGISTRY[b]
 		if e.has("files"):
-			out.append_array(e["files"])
+			a.append_array(e["files"])
 		else:
-			out.append(name)
-	out.append_array(LOOP_FILES)
-	out.append_array(MUSIC_FILES)
-	return out
+			a.append(b)
+	a.append_array(LOOP_FILES)
+	a.append_array(MUSIC_FILES)
+	return a
 
 
 func reset() -> void:
@@ -106,73 +101,71 @@ func reset() -> void:
 
 
 func take_requests() -> Array:
-	var out = requests
+	var a = requests
 	requests = []
-	return out
+	return a
 
 
-# Asks for a sound. Enforces cooldown and the voice limit. Returns true if it was accepted.
-func request(sound: String, db: float = 0.0, pitch: float = 1.0, variant: int = -1) -> bool:
-	if not REGISTRY.has(sound):
+func request(a: String, db: float = 0.0, b: float = 1.0, c: int = -1) -> bool:
+	if not REGISTRY.has(a):
 		return false
-	var e = REGISTRY[sound]
-	var last = _last_played.get(sound, -1000.0)
-	if (clock - last) * 1000.0 < float(e["cooldown_ms"]):
+	var e = REGISTRY[a]
+	var d = _last_played.get(a, -1000.0)
+	if (clock - d) * 1000.0 < float(e["cooldown_ms"]):
 		return false
-	var live = []
-	for end in _voices.get(sound, []):
-		if end > clock:
-			live.append(end)
-	if live.size() >= int(e["max_voices"]):
-		_voices[sound] = live
+	var f = []
+	for g in _voices.get(a, []):
+		if g > clock:
+			f.append(g)
+	if f.size() >= int(e["max_voices"]):
+		_voices[a] = f
 		return false
-	live.append(clock + float(e["dur"]))
-	_voices[sound] = live
-	_last_played[sound] = clock
-	var file = sound
+	f.append(clock + float(e["dur"]))
+	_voices[a] = f
+	_last_played[a] = clock
+	var h = a
 	if e.has("files"):
-		file = e["files"][int(clamp(variant, 0, e["files"].size() - 1))]
-	requests.append({"name": sound, "file": file, "bus": e["bus"], "db": float(e["base_db"]) + db, "pitch": pitch,
+		h = e["files"][int(clamp(c, 0, e["files"].size() - 1))]
+	requests.append({"name": a, "file": h, "bus": e["bus"], "db": float(e["base_db"]) + db, "pitch": b,
 			"priority": int(e["priority"]), "jitter": float(e["pitch_jitter"])})
 	return true
 
 
 func on_event(ev: Dictionary) -> void:
-	var kind = ev.get("type", "")
-	if kind == "deliver":
+	var a = ev.get("type", "")
+	if a == "deliver":
 		_on_delivery()
-	elif kind == "jam_start":
+	elif a == "jam_start":
 		streak = 0
 		request("jam_warn")
 		duck(4.0, 1.0)
-	elif kind == "gridlock_risk":
+	elif a == "gridlock_risk":
 		request("gridlock_warn")
-	elif kind == "patience_low":
+	elif a == "patience_low":
 		request("patience_low")
-	elif kind == "crash":
+	elif a == "crash":
 		request("crash")
-	elif kind == "light_switch":
+	elif a == "light_switch":
 		request("light_switch")
-	elif kind == "goal_reached":
+	elif a == "goal_reached":
 		request("goal_reached")
-	elif kind == "goal_failed":
+	elif a == "goal_failed":
 		request("goal_failed")
 
 
 func _on_delivery() -> void:
 	melody_on = true
 	last_delivery = clock
-	var note = int(min(streak, MAX_NOTE))
+	var a = int(min(streak, MAX_NOTE))
 	streak = int(min(streak + 1, MAX_NOTE))
 	if _pending_note < 0:
-		_pending_note = note
+		_pending_note = a
 		_pending_at = clock
 	else:
-		_pending_note = int(max(_pending_note, note))     # merged: the highest note of the burst
+		_pending_note = int(max(_pending_note, a))
 
 
-# Advances the clock by real seconds. `sim` (optional) lets the director read game state.
-func update(dt: float, sim = null) -> void:
+func update(dt: float, a = null) -> void:
 	clock += dt
 	if _pending_note >= 0 and clock - _pending_at >= DELIVER_MERGE_WINDOW:
 		request("deliver", 0.0, 1.0, _pending_note)
@@ -181,43 +174,41 @@ func update(dt: float, sim = null) -> void:
 		streak = 0
 	if duck_db != 0.0 and clock >= duck_until:
 		duck_db = 0.0
-	if sim != null:
+	if a != null:
 		_intensity_timer += dt
 		if _intensity_timer >= INTENSITY_INTERVAL:
 			_intensity_timer = 0.0
-			update_intensity(sim)
-		_update_countdown(sim)
+			update_intensity(a)
+		_update_countdown(a)
 
 
-func duck(db: float, seconds: float) -> void:
-	# `db` is a positive number of dB to lower the music by.
+func duck(db: float, a: float) -> void:
 	duck_db = -abs(db)
-	duck_until = clock + seconds
+	duck_until = clock + a
 
 
 func duck_offset() -> float:
 	return duck_db if clock < duck_until else 0.0
 
 
-func update_intensity(sim) -> float:
-	var jam_cells = 0
-	var roads = sim.grid.road_cells.size()
-	for cell in sim.density.keys():
-		if sim.density[cell] > 0.8:
-			jam_cells += 1
-	var jam_fraction = float(jam_cells) / float(max(roads, 1))
-	var lowest = 1.0
-	for w in sim.warehouses:
-		if sim.color_active(w.color):
-			lowest = min(lowest, w.patience / C.WAREHOUSE_PATIENCE_MAX)
-	var gridlock = clamp(sim.still_time / C.GRIDLOCK_SECONDS, 0.0, 1.0)
-	var target = 0.5 * clamp(jam_fraction * 4.0, 0.0, 1.0) + 0.3 * (1.0 - lowest) + 0.2 * gridlock
-	return set_intensity_target(target)
+func update_intensity(a) -> float:
+	var b = 0
+	var c = a.grid.road_cells.size()
+	for d in a.density.keys():
+		if a.density[d] > 0.8:
+			b += 1
+	var f = float(b) / float(max(c, 1))
+	var g = 1.0
+	for w in a.warehouses:
+		if a.color_active(w.color):
+			g = min(g, w.patience / C.WAREHOUSE_PATIENCE_MAX)
+	var h = clamp(a.still_time / C.GRIDLOCK_SECONDS, 0.0, 1.0)
+	var i = 0.5 * clamp(f * 4.0, 0.0, 1.0) + 0.3 * (1.0 - g) + 0.2 * h
+	return set_intensity_target(i)
 
 
-func set_intensity_target(target: float) -> float:
-	# Smoothed so the layers never flicker; tension has hysteresis (on above 0.5, off below 0.35).
-	intensity = clamp(lerp(intensity, clamp(target, 0.0, 1.0), 0.35), 0.0, 1.0)
+func set_intensity_target(a: float) -> float:
+	intensity = clamp(lerp(intensity, clamp(a, 0.0, 1.0), 0.35), 0.0, 1.0)
 	if not tension_on and intensity > TENSION_ON:
 		tension_on = true
 	elif tension_on and intensity < TENSION_OFF:
@@ -225,32 +216,30 @@ func set_intensity_target(target: float) -> float:
 	return intensity
 
 
-func _update_countdown(sim) -> void:
-	if sim.time_limit <= 0.0 or sim.finished:
+func _update_countdown(a) -> void:
+	if a.time_limit <= 0.0 or a.finished:
 		return
-	var left = sim.time_left()
-	if left <= 0.0 or left > COUNTDOWN_FROM:
+	var b = a.time_left()
+	if b <= 0.0 or b > COUNTDOWN_FROM:
 		_countdown_mark = -1
 		return
-	var whole = int(ceil(left))
-	if whole != _countdown_mark:
-		_countdown_mark = whole
+	var c = int(ceil(b))
+	if c != _countdown_mark:
+		_countdown_mark = c
 		request("countdown_tick")
 
 
-# Target level (0..1) of each music layer in a level.
 func layer_targets() -> Dictionary:
 	return {"base": 1.0, "melody": 1.0 if melody_on else 0.0, "tension": 1.0 if tension_on else 0.0}
 
 
-# Ambient traffic loudness (0..1) from the number of vehicles.
-func ambience_level(vehicle_count: int) -> float:
-	return clamp(float(vehicle_count) / 40.0, 0.0, 1.0)
+func ambience_level(a: int) -> float:
+	return clamp(float(a) / 40.0, 0.0, 1.0)
 
 
-static func music_pitch(speed: float) -> float:
-	if speed >= 4.0:
+static func music_pitch(a: float) -> float:
+	if a >= 4.0:
 		return 1.08
-	if speed >= 2.0:
+	if a >= 2.0:
 		return 1.04
 	return 1.0

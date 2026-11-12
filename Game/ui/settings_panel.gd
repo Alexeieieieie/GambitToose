@@ -1,6 +1,5 @@
 extends Control
 
-# Volume sliders (Master, Music, Effects) and the sound toggle. Changes apply at once and are saved.
 
 signal closed
 
@@ -19,11 +18,11 @@ func _ready() -> void:
 	rect_size = SCREEN
 	theme = ThemeBuilder.build()
 	visible = false
-	var dim = ColorRect.new()
-	dim.color = Palette.alpha(Palette.NAVY, 0.72)
-	dim.rect_size = SCREEN
-	dim.mouse_filter = Control.MOUSE_FILTER_STOP
-	add_child(dim)
+	var a = ColorRect.new()
+	a.color = Palette.alpha(Palette.NAVY, 0.72)
+	a.rect_size = SCREEN
+	a.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(a)
 	card = Panel.new()
 	card.rect_position = CARD.position
 	card.rect_size = CARD.size
@@ -31,12 +30,12 @@ func _ready() -> void:
 	add_child(card)
 	card.add_child(ThemeBuilder.label(Strings.t("SETTINGS"), Rect2(24, 16, 432, 40), 28, true, Palette.YELLOW))
 	var y = 76.0
-	for item in [["master", "VOL_MASTER"], ["music", "VOL_MUSIC"], ["effects", "VOL_EFFECTS"]]:
-		card.add_child(ThemeBuilder.label(Strings.t(item[1]), Rect2(24, y, 250, 28), 18, true, Palette.WHITE))
+	for b in [["master", "VOL_MASTER"], ["music", "VOL_MUSIC"], ["effects", "VOL_EFFECTS"]]:
+		card.add_child(ThemeBuilder.label(Strings.t(b[1]), Rect2(24, y, 250, 28), 18, true, Palette.WHITE))
 		var vl = ThemeBuilder.label("", Rect2(380, y, 76, 28), 18, true, Palette.TEXT_DIM)
 		vl.align = Label.ALIGN_RIGHT
 		card.add_child(vl)
-		value_labels[item[0]] = vl
+		value_labels[b[0]] = vl
 		var s = HSlider.new()
 		s.min_value = 0
 		s.max_value = 100
@@ -44,18 +43,18 @@ func _ready() -> void:
 		s.rect_position = Vector2(24, y + 34)
 		s.rect_size = Vector2(432, 24)
 		s.focus_mode = Control.FOCUS_NONE
-		s.connect("value_changed", self, "_on_value", [item[0]])
+		s.connect("value_changed", self, "_on_value", [b[0]])
 		s.connect("mouse_exited", self, "_save")
 		card.add_child(s)
-		sliders[item[0]] = s
+		sliders[b[0]] = s
 		y += 78.0
 	sound_btn = ThemeBuilder.button("", Rect2(24, 312, 200, 48), 18)
 	sound_btn.connect("pressed", self, "_on_sound")
 	card.add_child(sound_btn)
-	var close = ThemeBuilder.button(Strings.t("CLOSE"), Rect2(256, 312, 200, 48), 18)
-	ThemeBuilder.paint(close, Palette.YELLOW, Palette.NAVY)
-	close.connect("pressed", self, "close")
-	card.add_child(close)
+	var c = ThemeBuilder.button(Strings.t("CLOSE"), Rect2(256, 312, 200, 48), 18)
+	ThemeBuilder.paint(c, Palette.YELLOW, Palette.NAVY)
+	c.connect("pressed", self, "close")
+	card.add_child(c)
 
 
 func open() -> void:
@@ -73,17 +72,17 @@ func _sync_sound() -> void:
 	sound_btn.text = Strings.t("SOUND_ON") if Sfx.enabled else Strings.t("SOUND_OFF")
 
 
-func _on_value(v: float, which: String) -> void:
-	value_labels[which].text = str(int(v))
+func _on_value(v: float, a: String) -> void:
+	value_labels[a].text = str(int(v))
 	if not visible:
 		return
-	if which == "master":
+	if a == "master":
 		SaveData.vol_master = int(v)
-	elif which == "music":
+	elif a == "music":
 		SaveData.vol_music = int(v)
 	else:
 		SaveData.vol_effects = int(v)
-		Sfx.play("place_road")           # a sample of the effects level
+		Sfx.play("place_road")
 	Sfx.apply_settings()
 
 

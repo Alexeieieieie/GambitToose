@@ -1,8 +1,5 @@
 extends Node
 
-# Drives the real scenes end to end (first launch, every lesson, the final test, menus) and
-# saves screenshots. Development aid, not one of the required tests:
-#   SMOKE_OUT=/some/folder godot --path . res://tests/smoke.tscn
 
 const C = preload("res://sim/constants.gd")
 const TutorialData = preload("res://tutorial/tutorial_data.gd")
@@ -17,8 +14,8 @@ func _ready() -> void:
 	call_deferred("_run")
 
 
-func expect(what: String, ok: bool) -> void:
-	print(("ok   " if ok else "FAIL ") + what)
+func expect(a: String, ok: bool) -> void:
+	print(("ok   " if ok else "FAIL ") + a)
 	if not ok:
 		failures += 1
 
@@ -28,28 +25,28 @@ func frames(n: int) -> void:
 		yield(get_tree(), "idle_frame")
 
 
-func wait_real(seconds: float) -> void:
-	var until = OS.get_ticks_msec() + int(seconds * 1000.0)
-	while OS.get_ticks_msec() < until:
+func wait_real(a: float) -> void:
+	var b = OS.get_ticks_msec() + int(a * 1000.0)
+	while OS.get_ticks_msec() < b:
 		yield(get_tree(), "idle_frame")
 
 
-func shot(name: String) -> void:
+func shot(a: String) -> void:
 	yield(VisualServer, "frame_post_draw")
-	var img = get_viewport().get_texture().get_data()
-	img.flip_y()
-	img.save_png(out_dir + name + ".png")
-	print("shot " + name)
+	var b = get_viewport().get_texture().get_data()
+	b.flip_y()
+	b.save_png(out_dir + a + ".png")
+	print("shot " + a)
 
 
 func scene():
 	return get_tree().current_scene
 
 
-func click(at: Vector2, pressed: bool) -> void:
+func click(at: Vector2, a: bool) -> void:
 	var ev = InputEventMouseButton.new()
 	ev.button_index = BUTTON_LEFT
-	ev.pressed = pressed
+	ev.pressed = a
 	ev.position = at
 	ev.global_position = at
 	Input.parse_input_event(ev)
@@ -63,8 +60,8 @@ func move(at: Vector2) -> void:
 	Input.parse_input_event(ev)
 
 
-func cell_px(cell: Vector2) -> Vector2:
-	return Vector2(0, 56) + (cell + Vector2(0.5, 0.5)) * C.TILE
+func cell_px(a: Vector2) -> Vector2:
+	return Vector2(0, 56) + (a + Vector2(0.5, 0.5)) * C.TILE
 
 
 func press_control(c: Control) -> void:
@@ -77,34 +74,33 @@ func press_control(c: Control) -> void:
 	yield(frames(2), "completed")
 
 
-func go(path: String) -> void:
-	get_tree().change_scene(path)
+func go(a: String) -> void:
+	get_tree().change_scene(a)
 	yield(frames(12), "completed")
 
 
 func exec(g, e: Dictionary) -> void:
-	# Plays one entry of a lesson solution through the real game loop.
-	var what = e["do"]
-	if what == "continue":
+	var a = e["do"]
+	if a == "continue":
 		g.coach._on_continue()
-	elif what == "action":
+	elif a == "action":
 		g.sim.apply_action(e["action"])
 		g.grid_view.update()
 		g._tell_tutorial_changed()
-	elif what == "speed":
+	elif a == "speed":
 		if g.modal:
 			g.light_panel.visible = false
 			g.sorter_panel.visible = false
 			g._on_panel_closed()
 		g.set_speed(e["value"])
-	elif what == "heatmap":
+	elif a == "heatmap":
 		g.toggle_heatmap()
-	elif what == "run_for":
+	elif a == "run_for":
 		yield(frames(int(e["seconds"] * 10.0)), "completed")
-	elif what == "run":
-		var start = g.tutorial.idx
+	elif a == "run":
+		var b = g.tutorial.idx
 		var n = 0
-		while g.tutorial.idx == start and not g.tutorial.done and n < 9000:
+		while g.tutorial.idx == b and not g.tutorial.done and n < 9000:
 			n += 1
 			yield(get_tree(), "idle_frame")
 		if n >= 9000:
@@ -112,31 +108,29 @@ func exec(g, e: Dictionary) -> void:
 	yield(frames(3), "completed")
 
 
-func play_lesson(index: int, shots: Dictionary) -> void:
-	# `shots` maps solution entry numbers to screenshot names taken right after that entry.
+func play_lesson(a: int, b: Dictionary) -> void:
 	var g = scene()
-	var lesson = TutorialData.get_lesson(index)
-	yield(shot("%s_start" % lesson["id"]), "completed")
+	var d = TutorialData.get_lesson(a)
+	yield(shot("%s_start" % d["id"]), "completed")
 	var i = 0
-	for e in lesson["solution"]:
+	for e in d["solution"]:
 		yield(exec(g, e), "completed")
-		if shots.has(i):
+		if b.has(i):
 			yield(frames(20), "completed")
-			yield(shot(shots[i]), "completed")
+			yield(shot(b[i]), "completed")
 		i += 1
 		if g.tutorial.done:
 			break
 	yield(frames(10), "completed")
-	expect("lesson %s completed" % lesson["id"], g.tutorial.done)
+	expect("lesson %s completed" % d["id"], g.tutorial.done)
 
 
 func _run() -> void:
-	get_tree().current_scene = null          # keeps this node alive across scene changes
+	get_tree().current_scene = null
 	Engine.time_scale = 1.0
 	SaveData.delete_save()
 	Strings.lang = "en"
 
-	# --- first launch -> welcome screen
 	yield(go("res://ui/boot.tscn"), "completed")
 	yield(frames(10), "completed")
 	expect("fresh install shows the welcome screen", scene().name == "WelcomeScreen")
@@ -149,7 +143,6 @@ func _run() -> void:
 	yield(frames(15), "completed")
 	expect("tutorial starts in the game scene", scene().name == "Game" and scene().is_tutorial)
 
-	# --- lesson 1 with real mouse input
 	var g = scene()
 	yield(shot("03_l1_step1"), "completed")
 	g.coach._on_continue()
@@ -168,7 +161,6 @@ func _run() -> void:
 	yield(frames(10), "completed")
 	expect("dragging a road connects the buildings and advances the step", g.tutorial.idx == 3)
 	yield(shot("05_l1_press_play"), "completed")
-	# A locked tool must not work.
 	g.set_tool(C.Tool.LIGHT)
 	expect("locked tool is ignored in lesson 1", g.current_tool == C.Tool.ROAD)
 	yield(press_control(g.hud.speed_btns[1.0]), "completed")
@@ -185,7 +177,6 @@ func _run() -> void:
 	g.coach._on_next()
 	yield(frames(15), "completed")
 
-	# --- lessons 2 to 6 through the real game loop
 	Engine.time_scale = 4.0
 	yield(play_lesson(1, {1: "07_l2_red_road", 3: "08_l2_crash", 4: "09_l2_explain"}), "completed")
 	g = scene()
@@ -195,7 +186,6 @@ func _run() -> void:
 	g = scene()
 	g.coach._on_next()
 	yield(frames(15), "completed")
-	# Lesson 4 by hand: bridges by the solution, then the real Sorter tool and panel.
 	g = scene()
 	var l4 = TutorialData.get_lesson(3)
 	for k in range(6):
@@ -213,9 +203,9 @@ func _run() -> void:
 	yield(frames(10), "completed")
 	expect("applying different exits completes the sorter step", g.tutorial.current_step()["id"] == "l4_s6")
 	g.set_speed(4.0)
-	var guard = 0
-	while not g.tutorial.done and guard < 9000:
-		guard += 1
+	var a = 0
+	while not g.tutorial.done and a < 9000:
+		a += 1
 		yield(get_tree(), "idle_frame")
 	expect("lesson l4 completed", g.tutorial.done)
 	g = scene()
@@ -230,7 +220,6 @@ func _run() -> void:
 	g.coach._on_next()
 	yield(frames(15), "completed")
 
-	# --- final test
 	expect("final test scene", scene().lesson.get("final", false))
 	yield(shot("17_final_intro"), "completed")
 	Engine.time_scale = 4.0
@@ -241,7 +230,6 @@ func _run() -> void:
 	expect("tutorial is saved as done", not SaveData.is_first_run() and not SaveData.tutorial_skipped)
 	yield(shot("19_complete"), "completed")
 
-	# --- next launch goes straight to the menu
 	yield(go("res://ui/boot.tscn"), "completed")
 	yield(frames(10), "completed")
 	expect("second launch goes to the main menu", scene().name == "MainMenu")
@@ -251,7 +239,6 @@ func _run() -> void:
 	expect("language switch reloads the menu in Russian", Strings.lang == "ru" and scene().name == "MainMenu")
 	yield(shot("21_menu_ru"), "completed")
 
-	# --- replaying the tutorial in Russian, then back to English
 	scene()._on_tutorial()
 	yield(frames(15), "completed")
 	g = scene()
@@ -264,7 +251,6 @@ func _run() -> void:
 	yield(frames(10), "completed")
 	expect("language is English again", Strings.lang == "en")
 
-	# --- normal level with help overlay and a loss
 	Levels.mode = "level"
 	Levels.current = 0
 	yield(go("res://view/game.tscn"), "completed")
@@ -298,7 +284,6 @@ func _run() -> void:
 	yield(shot("24_level_lost"), "completed")
 	expect("an empty Level 1 ends in a loss", g.sim.result == "lose")
 
-	# --- a winning run of Level 1 shows the goals while playing and the stars at the end
 	SaveData.goal_masks = {}
 	Levels.mode = "level"
 	Levels.current = 0
@@ -329,13 +314,12 @@ func _run() -> void:
 	Levels.current = 0
 	yield(go("res://view/game.tscn"), "completed")
 
-	# --- restart five times: no growth in nodes
-	var counts = []
+	var b = []
 	for i in range(5):
 		scene().restart()
 		yield(frames(10), "completed")
-		counts.append(Performance.get_monitor(Performance.OBJECT_NODE_COUNT))
-	expect("node count is stable over restarts %s" % str(counts), counts[0] == counts[4])
+		b.append(Performance.get_monitor(Performance.OBJECT_NODE_COUNT))
+	expect("node count is stable over restarts %s" % str(b), b[0] == b[4])
 	print("SMOKE DONE failures=%d" % failures)
 	SaveData.delete_save()
 	get_tree().quit()

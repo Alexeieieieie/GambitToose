@@ -1,12 +1,11 @@
 extends Node
 
-# Level data, the selected level, and the local save file with best results.
 
 const C = preload("res://sim/constants.gd")
 
-var current = 0                  # index into LEVELS
-var mode = "level"               # "level" or "tutorial"
-var tutorial_index = 0           # lesson 0..5, and 6 is the final test
+var current = 0
+var mode = "level"
+var tutorial_index = 0
 
 var LEVELS = [
 	{
@@ -131,27 +130,26 @@ var LEVELS = [
 ]
 
 
-static func _line(from: Vector2, to: Vector2) -> Array:
-	var out = []
-	var d = Vector2(sign(to.x - from.x), sign(to.y - from.y))
-	var cell = from
+static func _line(a: Vector2, to: Vector2) -> Array:
+	var b = []
+	var d = Vector2(sign(to.x - a.x), sign(to.y - a.y))
+	var c = a
 	while true:
-		out.append(cell)
-		if cell == to:
+		b.append(c)
+		if c == to:
 			break
-		cell += d
-	return out
+		c += d
+	return b
 
 
-static func _river(narrow_columns: Array) -> Array:
-	# A river on rows 6 to 8. At the narrow columns it is one tile wide (row 7).
-	var out = []
+static func _river(a: Array) -> Array:
+	var b = []
 	for x in range(C.MAP_W):
 		for y in [6, 7, 8]:
-			if y != 7 and narrow_columns.has(x):
+			if y != 7 and a.has(x):
 				continue
-			out.append(Vector2(x, y))
-	return out
+			b.append(Vector2(x, y))
+	return b
 
 
 func level() -> Dictionary:

@@ -1,8 +1,5 @@
 extends Node
 
-# Every string the player can see lives in this file, in two languages.
-# Use Strings.t("KEY") for plain text and Strings.tf("KEY", [args]) for formatted text.
-# English is the default. Russian is an optional second language.
 
 const EN = {
 	"TITLE": "GambitToose",
@@ -504,21 +501,21 @@ func _ready() -> void:
 	_update_window_title()
 
 
-func t(key):
-	var table = EN if lang == "en" else RU
-	if table.has(key):
-		return table[key]
-	if EN.has(key):
-		return EN[key]
-	return "!" + str(key) + "!"      # visible marker for a missing key
+func t(a):
+	var b = EN if lang == "en" else RU
+	if b.has(a):
+		return b[a]
+	if EN.has(a):
+		return EN[a]
+	return "!" + str(a) + "!"
 
 
-func tf(key, args):
-	return t(key) % args             # args is always an Array
+func tf(a, b):
+	return t(a) % b
 
 
-func set_lang(code) -> void:
-	lang = code if code in ["en", "ru"] else "en"
+func set_lang(a) -> void:
+	lang = a if a in ["en", "ru"] else "en"
 	SaveData.set_language(lang)
 	_update_window_title()
 

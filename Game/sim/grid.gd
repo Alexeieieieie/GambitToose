@@ -1,86 +1,83 @@
 extends Reference
 
-# The tile map, tile reservations, and the rule for entering a tile.
 
 const C = preload("res://sim/constants.gd")
 
-var tiles = {}          # Vector2 -> Tile enum value
-var occupants = {}      # Vector2 -> Array of vehicles reserving this tile
-var controllers = {}    # Vector2 -> light or sorter object
-var road_cells = []     # every passable cell, in row order
-var junctions = {}      # Vector2 -> true
-var player_built = {}   # Vector2 -> true for tiles the player placed
-var reserved = {}       # Vector2 -> true for future building sites
+var tiles = {}
+var occupants = {}
+var controllers = {}
+var road_cells = []
+var junctions = {}
+var player_built = {}
+var reserved = {}
 var graph_dirty = true
 
-# Conflict tracking for the tutorial crash event.
 var track_conflicts = false
-var hold_for_crash = false     # tutorial lesson 2: make sure the first conflict really happens
+var hold_for_crash = false
 var now = 0.0
-var conflict_times = {} # Vector2 -> [time axis 0, time axis 1]
-var conflicts = []      # cells where two axes met within one second
+var conflict_times = {}
+var conflicts = []
 
 
 func setup() -> void:
 	for y in range(C.MAP_H):
 		for x in range(C.MAP_W):
-			var cell = Vector2(x, y)
-			tiles[cell] = C.Tile.EMPTY
-			occupants[cell] = []
+			var a = Vector2(x, y)
+			tiles[a] = C.Tile.EMPTY
+			occupants[a] = []
 	refresh_cells()
 
 
-func in_bounds(cell: Vector2) -> bool:
-	return cell.x >= 0 and cell.y >= 0 and cell.x < C.MAP_W and cell.y < C.MAP_H
+func in_bounds(a: Vector2) -> bool:
+	return a.x >= 0 and a.y >= 0 and a.x < C.MAP_W and a.y < C.MAP_H
 
 
-func tile(cell: Vector2) -> int:
-	return tiles.get(cell, C.Tile.OBSTACLE)
+func tile(a: Vector2) -> int:
+	return tiles.get(a, C.Tile.OBSTACLE)
 
 
-func is_roadlike(cell: Vector2) -> bool:
-	var t = tiles.get(cell, C.Tile.OBSTACLE)
+func is_roadlike(a: Vector2) -> bool:
+	var t = tiles.get(a, C.Tile.OBSTACLE)
 	return t == C.Tile.ROAD or t == C.Tile.BRIDGE
 
 
-func is_building(cell: Vector2) -> bool:
-	var t = tiles.get(cell, C.Tile.OBSTACLE)
+func is_building(a: Vector2) -> bool:
+	var t = tiles.get(a, C.Tile.OBSTACLE)
 	return t == C.Tile.FACTORY or t == C.Tile.WAREHOUSE
 
 
-func is_passable(cell: Vector2) -> bool:
-	var t = tiles.get(cell, C.Tile.OBSTACLE)
+func is_passable(a: Vector2) -> bool:
+	var t = tiles.get(a, C.Tile.OBSTACLE)
 	return t == C.Tile.ROAD or t == C.Tile.BRIDGE or t == C.Tile.FACTORY or t == C.Tile.WAREHOUSE
 
 
-func road_neighbor_count(cell: Vector2) -> int:
+func road_neighbor_count(a: Vector2) -> int:
 	var n = 0
 	for d in C.DIRS:
-		if is_roadlike(cell + d):
+		if is_roadlike(a + d):
 			n += 1
 	return n
 
 
-func is_junction(cell: Vector2) -> bool:
-	return junctions.has(cell)
+func is_junction(a: Vector2) -> bool:
+	return junctions.has(a)
 
 
-func capacity(cell: Vector2) -> int:
-	return C.JUNCTION_CAPACITY if junctions.has(cell) else C.ROAD_CAPACITY
+func capacity(a: Vector2) -> int:
+	return C.JUNCTION_CAPACITY if junctions.has(a) else C.ROAD_CAPACITY
 
 
-func center(cell: Vector2) -> Vector2:
-	return Vector2((cell.x + 0.5) * C.TILE, (cell.y + 0.5) * C.TILE)
+func center(a: Vector2) -> Vector2:
+	return Vector2((a.x + 0.5) * C.TILE, (a.y + 0.5) * C.TILE)
 
 
-func label(cell: Vector2) -> String:
-	# Column letter(s) and row number, for example B3.
-	var x = int(cell.x)
+func label(a: Vector2) -> String:
+	var x = int(a.x)
 	var s = ""
 	if x >= 26:
 		s += char(65 + int(x / 26) - 1)
 	s += char(65 + x % 26)
-	return s + str(int(cell.y) + 1)
+	return s + str(int(a.y) + 1)
 
 
 func refresh_cells() -> void:
@@ -88,11 +85,11 @@ func refresh_cells() -> void:
 	junctions = {}
 	for y in range(C.MAP_H):
 		for x in range(C.MAP_W):
-			var cell = Vector2(x, y)
-			if is_passable(cell):
-				road_cells.append(cell)
-				if is_roadlike(cell) and road_neighbor_count(cell) >= 3:
-					junctions[cell] = true
+			var a = Vector2(x, y)
+			if is_passable(a):
+				road_cells.append(a)
+				if is_roadlike(a) and road_neighbor_count(a) >= 3:
+					junctions[a] = true
 
 
 func mark_dirty() -> void:
@@ -100,40 +97,38 @@ func mark_dirty() -> void:
 	graph_dirty = true
 
 
-func try_enter(v, from: Vector2, to: Vector2) -> bool:
+func try_enter(v, a: Vector2, to: Vector2) -> bool:
 	if not is_passable(to):
 		return false
-	var ctrl = controllers.get(to)
-	if track_conflicts and ctrl == null and junctions.has(to):
-		_note_conflict(from, to)
+	var b = controllers.get(to)
+	if track_conflicts and b == null and junctions.has(to):
+		_note_conflict(a, to)
 		if hold_for_crash and conflicts.empty() and v.wait_time < C.CRASH_HOLD_MAX:
-			# Hold the first truck until one from the other axis is also here.
-			var other = 1 - (0 if from.y == to.y else 1)
-			if now - conflict_times[to][other] > 0.2:
+			var c = 1 - (0 if a.y == to.y else 1)
+			if now - conflict_times[to][c] > 0.2:
 				return false
-	var occ = occupants[to]
-	if occ.size() >= capacity(to):
+	var e = occupants[to]
+	if e.size() >= capacity(to):
 		return false
-	for o in occ:
-		# One vehicle per lane: a lane is identified by the tile it is entered from.
-		var ofrom = o.from_cell if o.cell == to else o.cell
-		if ofrom == from:
+	for o in e:
+		var f = o.from_cell if o.cell == to else o.cell
+		if f == a:
 			return false
-	if ctrl != null and not ctrl.allows(v, from):
+	if b != null and not b.allows(v, a):
 		return false
-	occ.append(v)                # reservation is immediate
+	e.append(v)
 	return true
 
 
-func leave(cell: Vector2, v) -> void:
-	occupants[cell].erase(v)
+func leave(a: Vector2, v) -> void:
+	occupants[a].erase(v)
 
 
-func _note_conflict(from: Vector2, to: Vector2) -> void:
-	var axis = 0 if from.y == to.y else 1
+func _note_conflict(a: Vector2, to: Vector2) -> void:
+	var b = 0 if a.y == to.y else 1
 	if not conflict_times.has(to):
 		conflict_times[to] = [-100.0, -100.0]
-	var times = conflict_times[to]
-	times[axis] = now
-	if abs(times[0] - times[1]) <= 1.0 and not conflicts.has(to):
+	var c = conflict_times[to]
+	c[b] = now
+	if abs(c[0] - c[1]) <= 1.0 and not conflicts.has(to):
 		conflicts.append(to)

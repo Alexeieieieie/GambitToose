@@ -15,7 +15,7 @@ GambitToose uses no third-party images, sprites, music or sound effects. Everyth
 
 ## Development tools (not shipped)
 
-- Python 3 (standard library) for the sound generator.
+
 - fontTools, used once to cut the static Nunito weights.
 
 Also listed in `Game/CREDITS.txt`.

@@ -1,6 +1,5 @@
 extends Node2D
 
-# Traffic density overlay. Redraws a few times per second, not every frame.
 
 const C = preload("res://sim/constants.gd")
 const DrawUtil = preload("res://ui/draw_util.gd")
@@ -9,15 +8,15 @@ var sim
 var timer = 0.0
 
 
-func setup(sim_) -> void:
-	sim = sim_
+func setup(a) -> void:
+	sim = a
 	visible = false
 
 
-func _process(delta: float) -> void:
+func _process(a: float) -> void:
 	if not visible:
 		return
-	timer += delta
+	timer += a
 	if timer >= C.HEATMAP_REDRAW_INTERVAL:
 		timer = 0.0
 		update()
@@ -35,11 +34,11 @@ func _draw() -> void:
 	if sim == null:
 		return
 	var g = sim.grid
-	for cell in g.road_cells:
-		if not g.is_roadlike(cell):
+	for a in g.road_cells:
+		if not g.is_roadlike(a):
 			continue
-		var d = max(sim.density.get(cell, 0.0), float(g.occupants[cell].size()) / g.capacity(cell) * 0.6)
-		var r = Rect2(cell * C.TILE + Vector2(2, 2), Vector2(C.TILE - 4, C.TILE - 4))
+		var d = max(sim.density.get(a, 0.0), float(g.occupants[a].size()) / g.capacity(a) * 0.6)
+		var r = Rect2(a * C.TILE + Vector2(2, 2), Vector2(C.TILE - 4, C.TILE - 4))
 		var lv = level_of(d)
 		if lv == 0:
 			draw_rect(r, Palette.alpha(Palette.OK, 0.45))

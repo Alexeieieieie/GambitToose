@@ -1,10 +1,5 @@
 extends Node2D
 
-# The level scene. Runs the simulation at a fixed timestep, turns mouse input into
-# build commands, and plays sounds and effects for simulation events.
-# Nothing here ever addresses a vehicle: the player builds roads and sets rules only.
-#
-# The same scene also runs the tutorial lessons (Levels.mode == "tutorial").
 
 const C = preload("res://sim/constants.gd")
 const Sim = preload("res://sim/sim.gd")
@@ -33,16 +28,16 @@ const TOOL_ORDER = [C.Tool.ROAD, C.Tool.BRIDGE, C.Tool.LIGHT, C.Tool.SORTER, C.T
 
 var sim
 var level = {}
-var lesson = {}                  # the tutorial lesson, when Levels.mode == "tutorial"
+var lesson = {}
 var is_tutorial = false
-var tutorial                     # TutorialManager, or null in normal levels
-var allowed_tools = []           # empty = every tool
-var speed = 0.0                  # 0 (pause), 1, 2, 4
+var tutorial
+var allowed_tools = []
+var speed = 0.0
 var last_speed = 1.0
 var acc = 0.0
 var current_tool = C.Tool.ROAD
 var heatmap_on = false
-var modal = false                # a panel or the results screen is open
+var modal = false
 var painting = false
 var last_cell = C.NO_CELL
 var ended = false
@@ -135,7 +130,6 @@ func _ready() -> void:
 	Sfx.set_speed(1.0)
 	Sfx.set_paused(true)
 	if goals_panel != null:
-		# The goals card is shown first; the simulation stays paused so the player can build.
 		intro = LevelIntro.new()
 		ui.add_child(intro)
 		intro.setup(sim)
@@ -159,8 +153,8 @@ func _setup_tutorial(ui: CanvasLayer) -> void:
 	tutorial.start(lesson, sim, Levels.tutorial_index + 1, TutorialData.lesson_count() - 1)
 
 
-func _layer(script) -> Node2D:
-	var n = script.new()
+func _layer(a) -> Node2D:
+	var n = a.new()
 	world.add_child(n)
 	n.setup(sim)
 	return n
@@ -177,90 +171,88 @@ func is_tool_allowed(id: int) -> bool:
 	return allowed_tools.empty() or allowed_tools.has(id)
 
 
-# ---------------------------------------------------------------- main loop
 
-func _process(delta: float) -> void:
+func _process(a: float) -> void:
 	_update_hover()
 	if tutorial != null:
-		tutorial.tick(delta)
+		tutorial.tick(a)
 		_keep_panel_open()
 	if sim.finished or modal:
 		_drain_events()
 		return
-	acc += delta * speed
+	acc += a * speed
 	var n = 0
 	while acc >= C.STEP and n < C.MAX_STEPS_PER_FRAME:
 		sim.step(C.STEP)
 		acc -= C.STEP
 		n += 1
 	if n == C.MAX_STEPS_PER_FRAME:
-		acc = 0.0                # drop the backlog so 4x never freezes the game
+		acc = 0.0
 	_drain_events()
 	vehicle_layer.update()
-	siren_timer += delta
+	siren_timer += a
 	if siren_timer >= 0.5:
 		siren_timer = 0.0
 		_update_siren()
 
 
 func _keep_panel_open() -> void:
-	# Some tutorial steps explain the controls inside a panel, so the panel stays open.
 	if modal or ended or help.visible:
 		return
-	var need = tutorial.needs_panel()
-	if need == "light" and sim.lights.size() > 0:
+	var a = tutorial.needs_panel()
+	if a == "light" and sim.lights.size() > 0:
 		_open_panel(sim.lights[0])
-	elif need == "sorter" and sim.sorters.size() > 0:
+	elif a == "sorter" and sim.sorters.size() > 0:
 		_open_panel(sim.sorters[0])
 
 
 func _update_siren() -> void:
-	var urgent = false
+	var a = false
 	if speed > 0.0:
 		for v in sim.vehicles:
 			if v.urgent:
-				urgent = true
+				a = true
 				break
-	Sfx.set_siren(urgent)
+	Sfx.set_siren(a)
 
 
 func _drain_events() -> void:
 	if sim.events.empty():
 		return
-	var list = sim.events
+	var a = sim.events
 	sim.events = []
-	for ev in list:
-		var kind = ev["type"]
-		Sfx.handle_event(ev)           # the audio director decides what (if anything) to play
-		if kind == "deliver":
+	for ev in a:
+		var b = ev["type"]
+		Sfx.handle_event(ev)
+		if b == "deliver":
 			fx.add("deliver", [ev["cell"]], 0.5, Palette.cargo(ev["color"]))
-		elif kind == "jam_start":
+		elif b == "jam_start":
 			hud.toast(Strings.t("TOAST_JAM"), 1.5)
-		elif kind == "crash":
+		elif b == "crash":
 			fx.add("crash", [ev["cell"]], 2.5)
 			_apply_speed(0.0)
 			if tutorial != null:
 				tutorial.notify("crash")
-		elif kind == "deadlock_cycle":
+		elif b == "deadlock_cycle":
 			fx.add("deadlock", ev["cells"], 1.6)
 			hud.toast(Strings.tf("TOAST_DEADLOCK", [sim.grid.label(ev["cells"][0])]), 2.5)
-		elif kind == "new_building":
+		elif b == "new_building":
 			grid_view.update()
 			Sfx.play("tutorial_step", 1.0, -4.0)
 			fx.add("new", ev["cells"], 6.0)
 			hud.toast(Strings.t("TOAST_NEW_BUILDING"), 4.0)
-		elif kind == "goal_reached" or kind == "goal_failed":
-			_on_goal_event(kind, int(ev["index"]))
-		elif kind == "finished":
+		elif b == "goal_reached" or b == "goal_failed":
+			_on_goal_event(b, int(ev["index"]))
+		elif b == "finished":
 			_on_finished()
 
 
-func _on_goal_event(kind: String, index: int) -> void:
+func _on_goal_event(a: String, b: int) -> void:
 	if goals_panel == null:
 		return
-	goals_panel.pop(index)
-	var key = "TOAST_GOAL_REACHED" if kind == "goal_reached" else "TOAST_GOAL_MISSED"
-	hud.toast(Strings.t(key) + "  " + goals_panel.goal_text(index), 2.6)
+	goals_panel.pop(b)
+	var c = "TOAST_GOAL_REACHED" if a == "goal_reached" else "TOAST_GOAL_MISSED"
+	hud.toast(Strings.t(c) + "  " + goals_panel.goal_text(b), 2.6)
 
 
 func _on_intro_started() -> void:
@@ -275,55 +267,52 @@ func _on_finished() -> void:
 	modal = true
 	painting = false
 	Sfx.set_siren(false)
-	var won = sim.won()
-	var new_bits = 0
+	var a = sim.won()
+	var b = 0
 	if sim.lose_cell != null:
 		fx.add("crash", [sim.lose_cell], 3.0)
 	if tutorial != null:
-		tutorial.notify("level_won" if won else "level_lost")
-	if is_tutorial and level.get("final_test", false) and won:
-		# Passing the final test ends the tutorial.
+		tutorial.notify("level_won" if a else "level_lost")
+	if is_tutorial and level.get("final_test", false) and a:
 		Sfx.play("win")
 		yield(get_tree().create_timer(1.4), "timeout")
 		next_lesson()
 		return
 	if not is_tutorial:
-		new_bits = SaveData.save_result(level["id"], sim.metrics.score(), sim.goals.earned_mask())
+		b = SaveData.save_result(level["id"], sim.metrics.score(), sim.goals.earned_mask())
 	Sfx.results_started()
-	Sfx.play("win" if won else "lose")
+	Sfx.play("win" if a else "lose")
 	yield(get_tree().create_timer(0.9), "timeout")
-	results.show_result(sim, Levels.has_next() and not is_tutorial, new_bits)
+	results.show_result(sim, Levels.has_next() and not is_tutorial, b)
 
 
-# ---------------------------------------------------------------- controls
 
-func _apply_speed(value: float) -> void:
-	# Changes the speed without telling the tutorial (used for automatic pauses).
-	if value > 0.0:
-		last_speed = value
-	speed = value
+func _apply_speed(a: float) -> void:
+	if a > 0.0:
+		last_speed = a
+	speed = a
 	Sfx.set_speed(last_speed)
 	Sfx.set_paused(speed == 0.0)
 	if speed == 0.0:
 		Sfx.set_siren(false)
 
 
-func set_speed(value: float) -> void:
-	var was_paused = speed == 0.0
-	if value != speed:
-		if value == 0.0:
+func set_speed(a: float) -> void:
+	var b = speed == 0.0
+	if a != speed:
+		if a == 0.0:
 			Sfx.play("pause")
-		elif was_paused:
+		elif b:
 			Sfx.play("resume")
-		elif value > speed:
+		elif a > speed:
 			Sfx.play("speed_up")
 		else:
 			Sfx.play("speed_down")
-	_apply_speed(value)
+	_apply_speed(a)
 	if tutorial != null:
-		if was_paused and value > 0.0:
+		if b and a > 0.0:
 			tutorial.notify("speed_started")
-		tutorial.notify("speed_set", {"value": value})
+		tutorial.notify("speed_set", {"value": a})
 
 
 func toggle_pause() -> void:
@@ -356,7 +345,6 @@ func _on_sound() -> void:
 
 
 func open_settings() -> void:
-	# The sound button opens Settings (sliders and the sound toggle).
 	if settings.visible or help.visible or ended:
 		return
 	overlay_prev_speed = speed
@@ -420,52 +408,51 @@ func ask_skip_tutorial() -> void:
 
 
 func skip_tutorial() -> void:
-	# Skipping the first-run tutorial counts as done; replaying it from the menu changes nothing.
 	if SaveData.is_first_run():
 		SaveData.finish_tutorial(true)
 	get_tree().change_scene("res://ui/main_menu.tscn")
 
 
-func _on_tutorial_step(step) -> void:
-	if step.get("pause_sim", false):
+func _on_tutorial_step(a) -> void:
+	if a.get("pause_sim", false):
 		_apply_speed(0.0)
 
 
-func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventKey:
-		if event.pressed and not event.echo:
-			_on_key(event.scancode)
+func _unhandled_input(a: InputEvent) -> void:
+	if a is InputEventKey:
+		if a.pressed and not a.echo:
+			_on_key(a.scancode)
 		return
 	if modal or ended:
 		return
-	if event is InputEventMouseButton and event.button_index == BUTTON_LEFT:
-		if event.pressed:
+	if a is InputEventMouseButton and a.button_index == BUTTON_LEFT:
+		if a.pressed:
 			painting = true
 			last_cell = C.NO_CELL
 			_use_tool(_mouse_cell(), true)
 		else:
 			painting = false
-	elif event is InputEventMouseMotion and painting:
+	elif a is InputEventMouseMotion and painting:
 		_drag_to(_mouse_cell())
 
 
-func _on_key(code: int) -> void:
-	if code == KEY_F3:
+func _on_key(a: int) -> void:
+	if a == KEY_F3:
 		hud.fps_on = not hud.fps_on
 		return
-	if code == KEY_F1:
+	if a == KEY_F1:
 		if help.visible:
 			help.close()
 		else:
 			open_help()
 		return
-	if code == KEY_G and goals_panel != null:
+	if a == KEY_G and goals_panel != null:
 		goals_panel.toggle()
 		return
-	if intro != null and intro.visible and (code == KEY_ENTER or code == KEY_KP_ENTER or code == KEY_SPACE):
+	if intro != null and intro.visible and (a == KEY_ENTER or a == KEY_KP_ENTER or a == KEY_SPACE):
 		intro.begin()
 		return
-	if code == KEY_ESCAPE:
+	if a == KEY_ESCAPE:
 		if settings.visible:
 			settings.close()
 		elif help.visible:
@@ -481,124 +468,122 @@ func _on_key(code: int) -> void:
 		else:
 			go_menu()
 		return
-	if code == KEY_R:
+	if a == KEY_R:
 		restart()
 		return
 	if modal or ended:
 		return
-	if code == KEY_SPACE:
+	if a == KEY_SPACE:
 		toggle_pause()
-	elif code == KEY_1:
+	elif a == KEY_1:
 		set_speed(1.0)
-	elif code == KEY_2:
+	elif a == KEY_2:
 		set_speed(2.0)
-	elif code == KEY_3:
+	elif a == KEY_3:
 		set_speed(4.0)
-	elif code == KEY_H:
+	elif a == KEY_H:
 		toggle_heatmap()
 
 
-# ---------------------------------------------------------------- building
 
 func _mouse_cell() -> Vector2:
 	return (world.get_local_mouse_position() / C.TILE).floor()
 
 
 func _update_hover() -> void:
-	var cell = _mouse_cell()
-	fx.hover_cell = cell
-	fx.hover_show = not modal and not ended and sim.grid.in_bounds(cell) \
+	var a = _mouse_cell()
+	fx.hover_cell = a
+	fx.hover_show = not modal and not ended and sim.grid.in_bounds(a) \
 			and get_viewport().get_mouse_position().y < 656.0
-	fx.hover_ok = _can_use(cell)
+	fx.hover_ok = _can_use(a)
 
 
-func _can_use(cell: Vector2) -> bool:
-	if sim.grid.controllers.has(cell) and current_tool != C.Tool.ERASE:
+func _can_use(a: Vector2) -> bool:
+	if sim.grid.controllers.has(a) and current_tool != C.Tool.ERASE:
 		return true
 	if current_tool == C.Tool.ROAD:
-		return sim.can_build_road(cell)
+		return sim.can_build_road(a)
 	if current_tool == C.Tool.BRIDGE:
-		return sim.can_build_bridge(cell)
+		return sim.can_build_bridge(a)
 	if current_tool == C.Tool.LIGHT:
-		return sim.can_place_controller(cell, "light")
+		return sim.can_place_controller(a, "light")
 	if current_tool == C.Tool.SORTER:
-		return sim.can_place_controller(cell, "sorter")
+		return sim.can_place_controller(a, "sorter")
 	if current_tool == C.Tool.ERASE:
-		return sim.can_erase(cell)
+		return sim.can_erase(a)
 	return false
 
 
-func _drag_to(cell: Vector2) -> void:
-	# Fill in the cells between two mouse samples so fast drags leave no gaps.
+func _drag_to(a: Vector2) -> void:
 	if current_tool != C.Tool.ROAD and current_tool != C.Tool.ERASE and current_tool != C.Tool.BRIDGE:
 		return
 	if last_cell == C.NO_CELL:
-		_use_tool(cell, false)
+		_use_tool(a, false)
 		return
-	var guard = 0
-	while last_cell != cell and guard < 64:
-		guard += 1
-		var d = cell - last_cell
-		var step = Vector2(sign(d.x), 0) if abs(d.x) >= abs(d.y) else Vector2(0, sign(d.y))
-		_use_tool(last_cell + step, false)
+	var b = 0
+	while last_cell != a and b < 64:
+		b += 1
+		var d = a - last_cell
+		var c = Vector2(sign(d.x), 0) if abs(d.x) >= abs(d.y) else Vector2(0, sign(d.y))
+		_use_tool(last_cell + c, false)
 
 
-func _deny(msg: String, tool_id: int = -1) -> void:
-	hud.toast(msg)
+func _deny(a: String, b: int = -1) -> void:
+	hud.toast(a)
 	Sfx.play("invalid")
-	if tool_id != -1:
-		hud.flash_tool(tool_id)           # the count flashes red for a moment
+	if b != -1:
+		hud.flash_tool(b)
 
 
-func _use_tool(cell: Vector2, is_click: bool) -> void:
-	last_cell = cell
-	if not sim.grid.in_bounds(cell):
+func _use_tool(a: Vector2, b: bool) -> void:
+	last_cell = a
+	if not sim.grid.in_bounds(a):
 		return
-	var ctrl = sim.grid.controllers.get(cell)
-	if ctrl != null and current_tool != C.Tool.ERASE:
-		if is_click:
-			_open_panel(ctrl)
+	var c = sim.grid.controllers.get(a)
+	if c != null and current_tool != C.Tool.ERASE:
+		if b:
+			_open_panel(c)
 		return
-	var built = false
-	var sound = "place_road"
+	var e = false
+	var f = "place_road"
 	if current_tool == C.Tool.ROAD:
-		built = sim.build_road(cell)
-		if not built and is_click:
-			if sim.inventory["road"] <= 0 and sim.grid.tile(cell) == C.Tile.EMPTY:
+		e = sim.build_road(a)
+		if not e and b:
+			if sim.inventory["road"] <= 0 and sim.grid.tile(a) == C.Tile.EMPTY:
 				_deny(Strings.t("TOAST_NO_ITEMS"), C.Tool.ROAD)
-			elif sim.grid.tile(cell) != C.Tile.EMPTY or sim.grid.reserved.has(cell):
-				Sfx.play("invalid")        # a blocked tile
+			elif sim.grid.tile(a) != C.Tile.EMPTY or sim.grid.reserved.has(a):
+				Sfx.play("invalid")
 	elif current_tool == C.Tool.BRIDGE:
-		sound = "place_bridge"
-		built = sim.build_bridge(cell)
-		if not built and is_click:
-			if sim.grid.tile(cell) != C.Tile.WATER:
+		f = "place_bridge"
+		e = sim.build_bridge(a)
+		if not e and b:
+			if sim.grid.tile(a) != C.Tile.WATER:
 				_deny(Strings.t("TOAST_NEED_WATER"))
 			elif sim.inventory["bridge"] <= 0:
 				_deny(Strings.t("TOAST_NO_ITEMS"), C.Tool.BRIDGE)
 	elif current_tool == C.Tool.LIGHT or current_tool == C.Tool.SORTER:
-		if not is_click:
+		if not b:
 			return
-		var kind = "light" if current_tool == C.Tool.LIGHT else "sorter"
-		var placed = sim.place_light(cell) if kind == "light" else sim.place_sorter(cell)
-		if placed != null:
-			built = true
-			sound = "place_light" if kind == "light" else "place_sorter"
-			_open_panel(placed)
-		elif sim.inventory[kind] <= 0:
+		var g = "light" if current_tool == C.Tool.LIGHT else "sorter"
+		var h = sim.place_light(a) if g == "light" else sim.place_sorter(a)
+		if h != null:
+			e = true
+			f = "place_light" if g == "light" else "place_sorter"
+			_open_panel(h)
+		elif sim.inventory[g] <= 0:
 			_deny(Strings.t("TOAST_NO_ITEMS"), current_tool)
 		else:
 			_deny(Strings.t("TOAST_NEED_JUNCTION"))
 	elif current_tool == C.Tool.ERASE:
-		if sim.erase(cell) != "":
+		if sim.erase(a) != "":
 			Sfx.play("erase")
-			fx.add("erase", [cell], 0.3)
+			fx.add("erase", [a], 0.3)
 			grid_view.update()
 			_tell_tutorial_changed()
 		return
-	if built:
-		Sfx.play(sound)
-		fx.add("pop", [cell], 0.3)
+	if e:
+		Sfx.play(f)
+		fx.add("pop", [a], 0.3)
 		grid_view.update()
 		_tell_tutorial_changed()
 
@@ -608,24 +593,24 @@ func _tell_tutorial_changed() -> void:
 		tutorial.notify("changed")
 
 
-func _open_panel(ctrl) -> void:
+func _open_panel(a) -> void:
 	painting = false
 	modal = true
 	Sfx.play("panel_open")
-	var where = sim.grid.label(ctrl.cell)
-	if ctrl.is_sorter:
-		sorter_panel.open(ctrl, sim.pathing.valid_dirs(sim.grid, ctrl.cell), where)
+	var b = sim.grid.label(a.cell)
+	if a.is_sorter:
+		sorter_panel.open(a, sim.pathing.valid_dirs(sim.grid, a.cell), b)
 	else:
-		light_panel.open(ctrl, where)
+		light_panel.open(a, b)
 
 
-func _on_light_applied(cell, mode, period, threshold, urgent_first) -> void:
-	sim.configure_light(cell, mode, period, threshold, urgent_first)
+func _on_light_applied(a, b, c, e, f) -> void:
+	sim.configure_light(a, b, c, e, f)
 	_tell_tutorial_changed()
 
 
-func _on_sorter_applied(cell, rules) -> void:
-	sim.configure_sorter(cell, rules)
+func _on_sorter_applied(a, b) -> void:
+	sim.configure_sorter(a, b)
 	_tell_tutorial_changed()
 
 

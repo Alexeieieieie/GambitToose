@@ -1,6 +1,5 @@
 extends Control
 
-# Title screen with a decorative road. Everything is drawn in code.
 
 const DrawUtil = preload("res://ui/draw_util.gd")
 const ThemeBuilder = preload("res://ui/theme_builder.gd")
@@ -21,8 +20,8 @@ func _ready() -> void:
 	theme = ThemeBuilder.build()
 	trucks = Backdrop.make_trucks()
 	var y = 250.0
-	var play = _button(Strings.t("PLAY"), Rect2(480, y, 320, 56), 24, "_on_play")
-	ThemeBuilder.paint(play, Palette.YELLOW, Palette.NAVY)
+	var a = _button(Strings.t("PLAY"), Rect2(480, y, 320, 56), 24, "_on_play")
+	ThemeBuilder.paint(a, Palette.YELLOW, Palette.NAVY)
 	_button(Strings.t("LEVELS"), Rect2(480, y + 66, 320, 56), 24, "_on_levels")
 	_button(Strings.t("TUTORIAL"), Rect2(480, y + 132, 320, 56), 24, "_on_tutorial")
 	settings_btn = _button(Strings.t("SETTINGS"), Rect2(480, y + 198, 150, 50), 16, "_on_settings")
@@ -35,16 +34,16 @@ func _ready() -> void:
 	Sfx.start_menu_music()
 
 
-func _button(caption: String, r: Rect2, size: int, method: String) -> Button:
-	var b = ThemeBuilder.button(caption, r, size)
-	b.connect("pressed", self, method)
+func _button(a: String, r: Rect2, c: int, d: String) -> Button:
+	var b = ThemeBuilder.button(a, r, c)
+	b.connect("pressed", self, d)
 	add_child(b)
 	Sfx.hover_hook(b)
 	return b
 
 
-func _process(delta: float) -> void:
-	clock += delta
+func _process(a: float) -> void:
+	clock += a
 	update()
 
 
@@ -67,7 +66,6 @@ func _on_levels() -> void:
 
 
 func _on_tutorial() -> void:
-	# Replaying never changes saved progress.
 	Sfx.play("ui_click")
 	Levels.mode = "tutorial"
 	Levels.tutorial_index = 0

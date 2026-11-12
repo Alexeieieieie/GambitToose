@@ -1,10 +1,5 @@
 extends Reference
 
-# Lesson and step definitions. Data only: no logic and no scene-tree access.
-#
-# A lesson is a level dictionary (same format as autoload/levels.gd) plus its steps.
-# `wait` says what completes a step (see tutorial_manager.gd for the event names).
-# `solution` is a list of headless actions used by the tests (see tutorial_solver.gd).
 
 const C = preload("res://sim/constants.gd")
 
@@ -16,11 +11,11 @@ static func _line(a: Vector2, b: Vector2) -> Dictionary:
 	return {"type": "road_line", "from": a, "to": b}
 
 
-static func _step(id: String, wait: Dictionary, extra: Dictionary = {}) -> Dictionary:
-	var s = {"id": id, "text_key": "TUT_" + id.to_upper(), "wait": wait}
-	for key in extra.keys():
-		s[key] = extra[key]
-	if wait["event"] != "continue":
+static func _step(id: String, c: Dictionary, d: Dictionary = {}) -> Dictionary:
+	var s = {"id": id, "text_key": "TUT_" + id.to_upper(), "wait": c}
+	for e in d.keys():
+		s[e] = d[e]
+	if c["event"] != "continue":
 		s["hint_key"] = s["text_key"] + "_HINT"
 	return s
 
@@ -37,17 +32,17 @@ static func lesson_count() -> int:
 	return 7
 
 
-static func get_lesson(index: int) -> Dictionary:
-	return get_lessons()[index]
+static func get_lesson(c: int) -> Dictionary:
+	return get_lessons()[c]
 
 
 static func get_lessons() -> Array:
 	return [_l1(), _l2(), _l3(), _l4(), _l5(), _l6(), _final()]
 
 
-static func _blue_row_level(id: int, seed_: int) -> Dictionary:
+static func _blue_row_level(id: int, c: int) -> Dictionary:
 	return {
-		"id": id, "seed": seed_, "time": 0, "goal": 0, "mode": "score",
+		"id": id, "seed": c, "time": 0, "goal": 0, "mode": "score",
 		"lesson": true, "lose_enabled": false,
 		"factories": [{"cell": Vector2(4, 7), "color": BLUE, "interval": 4.0, "start_at": 0.0}],
 		"warehouses": [{"cell": Vector2(27, 7), "color": BLUE}],
@@ -56,21 +51,20 @@ static func _blue_row_level(id: int, seed_: int) -> Dictionary:
 	}
 
 
-# ------------------------------------------------------------------ lesson 1
 static func _l1() -> Dictionary:
 	var lv = _blue_row_level(101, 101)
 	lv["name_key"] = "TUT_L1_TITLE"
 	lv["goal"] = 3
 	lv["inventory"]["road"] = 30
 	lv["allowed_tools"] = [C.Tool.ROAD, C.Tool.ERASE]
-	var both = [Vector2(4, 7), Vector2(27, 7)]
+	var c = [Vector2(4, 7), Vector2(27, 7)]
 	return {
 		"id": "l1", "title_key": "TUT_L1_TITLE", "level": lv,
 		"steps": [
 			_step("l1_s1", _cont()),
-			_step("l1_s2", _cont(), {"highlight_cells": both}),
+			_step("l1_s2", _cont(), {"highlight_cells": c}),
 			_step("l1_s3", {"event": "road_connected", "color": BLUE},
-					{"highlight_cells": both, "highlight_ui": ["tool_road"]}),
+					{"highlight_cells": c, "highlight_ui": ["tool_road"]}),
 			_step("l1_s4", {"event": "speed_started"}, {"highlight_ui": ["btn_speed_1"]}),
 			_step("l1_s5", {"event": "delivered_count", "n": 3},
 					{"highlight_cells": [Vector2(27, 7)], "highlight_ui": ["deliveries_bar"]}),
@@ -84,7 +78,6 @@ static func _l1() -> Dictionary:
 	}
 
 
-# ------------------------------------------------------------------ lesson 2
 static func _l2() -> Dictionary:
 	var lv = _blue_row_level(102, 102)
 	lv["name_key"] = "TUT_L2_TITLE"
@@ -94,14 +87,13 @@ static func _l2() -> Dictionary:
 	lv["warehouses"].append({"cell": Vector2(15, 12), "color": RED})
 	lv["inventory"]["road"] = 15
 	lv["allowed_tools"] = [C.Tool.ROAD, C.Tool.ERASE]
-	var reds = [Vector2(15, 2), Vector2(15, 12)]
+	var c = [Vector2(15, 2), Vector2(15, 12)]
 	return {
 		"id": "l2", "title_key": "TUT_L2_TITLE", "level": lv,
 		"steps": [
-			_step("l2_s1", _cont(), {"highlight_cells": reds}),
+			_step("l2_s1", _cont(), {"highlight_cells": c}),
 			_step("l2_s2", {"event": "road_connected", "color": RED},
-					{"highlight_cells": reds, "highlight_ui": ["tool_road"]}),
-			# The crash happens a few seconds after 1x is pressed; the next step explains it.
+					{"highlight_cells": c, "highlight_ui": ["tool_road"]}),
 			_step("l2_s3", {"event": "crash"}, {"highlight_ui": ["btn_speed_1"]}),
 			_step("l2_s4", _cont(), {"highlight_cells": [Vector2(15, 7)], "pause_sim": true}),
 			_step("l2_s5", _cont(), {"pause_sim": true}),
@@ -116,9 +108,8 @@ static func _l2() -> Dictionary:
 	}
 
 
-# ------------------------------------------------------------------ lesson 3
-static func _crossing_level(id: int, seed_: int) -> Dictionary:
-	var lv = _blue_row_level(id, seed_)
+static func _crossing_level(id: int, c: int) -> Dictionary:
+	var lv = _blue_row_level(id, c)
 	lv["prebuilt"] = [_line(Vector2(5, 7), Vector2(26, 7)), _line(Vector2(15, 3), Vector2(15, 11))]
 	lv["factories"] = [
 		{"cell": Vector2(4, 7), "color": BLUE, "interval": 2.5, "start_at": 0.0},
@@ -156,13 +147,12 @@ static func _l3() -> Dictionary:
 	}
 
 
-# ------------------------------------------------------------------ lesson 4
 static func _l4() -> Dictionary:
-	var water = []
+	var c = []
 	for y in range(C.MAP_H):
-		water.append(Vector2(14, y))
-		water.append(Vector2(15, y))
-	var roads = [
+		c.append(Vector2(14, y))
+		c.append(Vector2(15, y))
+	var d = [
 		_line(Vector2(3, 6), Vector2(3, 8)), _line(Vector2(4, 7), Vector2(8, 7)),
 		_line(Vector2(8, 3), Vector2(8, 6)), _line(Vector2(8, 8), Vector2(8, 11)),
 		_line(Vector2(9, 3), Vector2(13, 3)), _line(Vector2(9, 11), Vector2(13, 11)),
@@ -175,31 +165,30 @@ static func _l4() -> Dictionary:
 			{"cell": Vector2(2, 6), "color": BLUE, "interval": 4.0, "start_at": 0.0},
 			{"cell": Vector2(2, 8), "color": RED, "interval": 4.0, "start_at": 0.0},
 		],
-		# Both colors have a warehouse at the end of each crossing, so either split works.
 		"warehouses": [
 			{"cell": Vector2(28, 3), "color": BLUE}, {"cell": Vector2(27, 2), "color": RED},
 			{"cell": Vector2(28, 11), "color": RED}, {"cell": Vector2(27, 12), "color": BLUE},
 		],
-		"water": water, "obstacles": [], "roads": [], "prebuilt": roads,
+		"water": c, "obstacles": [], "roads": [], "prebuilt": d,
 		"inventory": {"road": 0, "light": 0, "sorter": 1, "bridge": 4},
 		"allowed_tools": [C.Tool.BRIDGE, C.Tool.SORTER],
 	}
-	var banks = [Vector2(13, 3), Vector2(16, 3), Vector2(13, 11), Vector2(16, 11)]
+	var e = [Vector2(13, 3), Vector2(16, 3), Vector2(13, 11), Vector2(16, 11)]
 	var up = [Vector2(14, 3), Vector2(15, 3)]
-	var down = [Vector2(14, 11), Vector2(15, 11)]
-	var fork = [Vector2(8, 7)]
+	var f = [Vector2(14, 11), Vector2(15, 11)]
+	var g = [Vector2(8, 7)]
 	return {
 		"id": "l4", "title_key": "TUT_L4_TITLE", "level": lv,
 		"steps": [
-			_step("l4_s1", _cont(), {"highlight_cells": banks}),
+			_step("l4_s1", _cont(), {"highlight_cells": e}),
 			_step("l4_s2", {"event": "bridge_placed", "count": 4},
-					{"highlight_cells": up + down, "highlight_ui": ["tool_bridge"],
+					{"highlight_cells": up + f, "highlight_ui": ["tool_bridge"],
 					"checklist": [
 						{"key": "TUT_CK_UP", "cond": {"event": "bridge_placed", "cells": up}},
-						{"key": "TUT_CK_DOWN", "cond": {"event": "bridge_placed", "cells": down}},
+						{"key": "TUT_CK_DOWN", "cond": {"event": "bridge_placed", "cells": f}},
 					]}),
-			_step("l4_s3", _cont(), {"highlight_cells": fork}),
-			_step("l4_s4", {"event": "sorter_placed"}, {"highlight_cells": fork, "highlight_ui": ["tool_sorter"]}),
+			_step("l4_s3", _cont(), {"highlight_cells": g}),
+			_step("l4_s4", {"event": "sorter_placed"}, {"highlight_cells": g, "highlight_ui": ["tool_sorter"]}),
 			_step("l4_s5", {"event": "sorter_rule_set"}, {"highlight_ui": ["sorter_apply"], "needs_panel": "sorter"}),
 			_step("l4_s6", {"event": "delivered_count", "n": 6}, {"highlight_ui": ["btn_speed_1"]}),
 		],
@@ -218,7 +207,6 @@ static func _l4() -> Dictionary:
 	}
 
 
-# ------------------------------------------------------------------ lesson 5
 static func _l5() -> Dictionary:
 	var lv = _blue_row_level(105, 105)
 	lv["name_key"] = "TUT_L5_TITLE"
@@ -246,7 +234,6 @@ static func _l5() -> Dictionary:
 	}
 
 
-# ------------------------------------------------------------------ lesson 6
 static func _l6() -> Dictionary:
 	var lv = _crossing_level(106, 106)
 	lv["name_key"] = "TUT_L6_TITLE"
@@ -274,12 +261,11 @@ static func _l6() -> Dictionary:
 	}
 
 
-# ------------------------------------------------------------------ final test
 static func _final() -> Dictionary:
-	var water = []
+	var c = []
 	for y in range(C.MAP_H):
-		water.append(Vector2(14, y))
-		water.append(Vector2(15, y))
+		c.append(Vector2(14, y))
+		c.append(Vector2(15, y))
 	var lv = {
 		"id": 107, "name_key": "TUT_FINAL_TITLE", "seed": 202, "time": 90, "goal": 6, "mode": "goal",
 		"final_test": true,
@@ -288,7 +274,7 @@ static func _final() -> Dictionary:
 			{"cell": Vector2(3, 10), "color": RED, "interval": 5.0, "start_at": 0.0},
 		],
 		"warehouses": [{"cell": Vector2(28, 10), "color": BLUE}, {"cell": Vector2(28, 4), "color": RED}],
-		"water": water, "obstacles": [], "roads": [], "prebuilt": [],
+		"water": c, "obstacles": [], "roads": [], "prebuilt": [],
 		"inventory": {"road": 60, "light": 1, "sorter": 1, "bridge": 2},
 		"allowed_tools": _all_tools(),
 	}

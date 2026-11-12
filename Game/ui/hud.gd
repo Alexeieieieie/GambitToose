@@ -1,6 +1,5 @@
 extends Control
 
-# Top bar and toolbar. Reads the game state; sends the player's choices as signals.
 
 signal tool_chosen(id)
 signal speed_chosen(value)
@@ -20,9 +19,9 @@ const SCREEN = Vector2(1280, 720)
 
 var game
 var pause_btn
-var speed_btns = {}              # speed value -> Button
-var tool_btns = {}               # tool id -> Button
-var tool_info = []               # [tool id, caption, inventory key, dot color]
+var speed_btns = {}
+var tool_btns = {}
+var tool_info = []
 var heat_btn
 var sound_btn
 var menu_btn
@@ -33,12 +32,12 @@ var toast_text = ""
 var toast_time = 0.0
 var fps_on = false
 var tween
-var shown = {}                   # last values pushed into the buttons
-var flashes = {}                 # tool id -> seconds left of the red "no items" flash
+var shown = {}
+var flashes = {}
 
 
-func setup(game_) -> void:
-	game = game_
+func setup(d) -> void:
+	game = d
 	rect_size = SCREEN
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	theme = ThemeBuilder.build()
@@ -47,11 +46,11 @@ func setup(game_) -> void:
 
 	pause_btn = _button(Strings.t("PLAY"), Rect2(716, 9, 98, 38), "_on_pause")
 	var x = 822.0
-	for item in [[1.0, Strings.t("SPEED_1"), "btn_speed_1"], [2.0, Strings.t("SPEED_2"), "btn_speed_2"],
+	for e in [[1.0, Strings.t("SPEED_1"), "btn_speed_1"], [2.0, Strings.t("SPEED_2"), "btn_speed_2"],
 			[4.0, Strings.t("SPEED_4"), "btn_speed_4"]]:
-		var b = _button(item[1], Rect2(x, 9, 52, 38), "_on_speed", [item[0]])
-		speed_btns[item[0]] = b
-		UiRegistry.register(item[2], b)
+		var b = _button(e[1], Rect2(x, 9, 52, 38), "_on_speed", [e[0]])
+		speed_btns[e[0]] = b
+		UiRegistry.register(e[2], b)
 		x += 56.0
 	help_btn = _button(Strings.t("HELP_BTN"), Rect2(994, 9, 44, 38), "_on_help")
 	help_btn.hint_tooltip = Strings.t("HELP")
@@ -59,7 +58,6 @@ func setup(game_) -> void:
 	menu_btn = _button(Strings.t("MENU"), Rect2(1174, 9, 94, 38), "_on_menu")
 	UiRegistry.register("btn_pause", pause_btn)
 	UiRegistry.register("btn_help", help_btn)
-	# An invisible control over the deliveries bar, so the tutorial can point at it.
 	bar_zone = Control.new()
 	bar_zone.rect_position = Vector2(230, 22)
 	bar_zone.rect_size = Vector2(366, 22)
@@ -67,7 +65,7 @@ func setup(game_) -> void:
 	add_child(bar_zone)
 	UiRegistry.register("deliveries_bar", bar_zone)
 
-	tool_info = [                    # [tool id, caption, inventory key, dot color, registry name]
+	tool_info = [
 		[C.Tool.ROAD, Strings.t("ROAD"), "road", Palette.ASPHALT, "tool_road"],
 		[C.Tool.BRIDGE, Strings.t("BRIDGE"), "bridge", Palette.BRIDGE_DECK, "tool_bridge"],
 		[C.Tool.LIGHT, Strings.t("LIGHT"), "light", Palette.OK, "tool_light"],
@@ -75,10 +73,10 @@ func setup(game_) -> void:
 		[C.Tool.ERASE, Strings.t("ERASE"), "", Palette.JAM, "tool_erase"],
 	]
 	x = 12.0
-	for info in tool_info:
-		var b = _button("", Rect2(x, BAR_Y + 10, 178, 44), "_on_tool", [info[0]])
-		tool_btns[info[0]] = b
-		UiRegistry.register(info[4], b)
+	for f in tool_info:
+		var b = _button("", Rect2(x, BAR_Y + 10, 178, 44), "_on_tool", [f[0]])
+		tool_btns[f[0]] = b
+		UiRegistry.register(f[4], b)
 		x += 186.0
 	heat_btn = _button(Strings.t("HEATMAP"), Rect2(1040, BAR_Y + 10, 228, 44), "_on_heatmap")
 	UiRegistry.register("btn_heatmap", heat_btn)
@@ -94,7 +92,6 @@ func setup(game_) -> void:
 
 
 func _blocker(r: Rect2) -> void:
-	# Stops clicks on the bars from reaching the map underneath.
 	var c = Control.new()
 	c.rect_position = r.position
 	c.rect_size = r.size
@@ -102,10 +99,10 @@ func _blocker(r: Rect2) -> void:
 	add_child(c)
 
 
-func _button(caption: String, r: Rect2, method: String, binds: Array = []) -> Button:
-	var b = ThemeBuilder.button(caption, r)
+func _button(d: String, r: Rect2, e: String, f: Array = []) -> Button:
+	var b = ThemeBuilder.button(d, r)
 	b.rect_pivot_offset = r.size / 2.0
-	b.connect("pressed", self, method, binds + [b])
+	b.connect("pressed", self, e, f + [b])
 	add_child(b)
 	return b
 
@@ -122,9 +119,9 @@ func _on_pause(b) -> void:
 	emit_signal("pause_pressed")
 
 
-func _on_speed(value, b) -> void:
+func _on_speed(d, b) -> void:
 	_pop(b)
-	emit_signal("speed_chosen", value)
+	emit_signal("speed_chosen", d)
 
 
 func _on_tool(id, b) -> void:
@@ -160,18 +157,18 @@ func flash_tool(id: int) -> void:
 	flashes[id] = 0.45
 
 
-func toast(msg: String, seconds: float = 2.5) -> void:
-	toast_text = msg
-	toast_time = seconds
+func toast(d: String, e: float = 2.5) -> void:
+	toast_text = d
+	toast_time = e
 
 
-func _process(delta: float) -> void:
+func _process(d: float) -> void:
 	if game == null:
 		return
 	if toast_time > 0.0:
-		toast_time -= delta
+		toast_time -= d
 	for id in flashes.keys():
-		flashes[id] -= delta
+		flashes[id] -= d
 		if flashes[id] <= 0.0:
 			flashes.erase(id)
 	_refresh(false)
@@ -179,128 +176,121 @@ func _process(delta: float) -> void:
 	overlay.update()
 
 
-func _changed(key: String, value) -> bool:
-	if shown.get(key) == value:
+func _changed(d: String, e) -> bool:
+	if shown.get(d) == e:
 		return false
-	shown[key] = value
+	shown[d] = e
 	return true
 
 
-func _refresh(force: bool) -> void:
-	if force:
+func _refresh(d: bool) -> void:
+	if d:
 		shown = {}
-	var paused = game.speed == 0.0
-	if _changed("paused", paused):
-		pause_btn.text = Strings.t("PLAY") if paused else Strings.t("PAUSE")
-		if paused:
+	var e = game.speed == 0.0
+	if _changed("paused", e):
+		pause_btn.text = Strings.t("PLAY") if e else Strings.t("PAUSE")
+		if e:
 			ThemeBuilder.paint(pause_btn, Palette.YELLOW, Palette.NAVY)
 		else:
 			ThemeBuilder.paint(pause_btn, Palette.NAVY_LIGHT, Palette.WHITE)
-	var active_speed = game.speed if game.speed > 0.0 else game.last_speed
-	if _changed("speed", active_speed):
-		for value in speed_btns.keys():
-			if value == active_speed:
-				ThemeBuilder.paint(speed_btns[value], Palette.YELLOW, Palette.NAVY)
+	var f = game.speed if game.speed > 0.0 else game.last_speed
+	if _changed("speed", f):
+		for g in speed_btns.keys():
+			if g == f:
+				ThemeBuilder.paint(speed_btns[g], Palette.YELLOW, Palette.NAVY)
 			else:
-				ThemeBuilder.paint(speed_btns[value], Palette.NAVY_LIGHT, Palette.WHITE)
+				ThemeBuilder.paint(speed_btns[g], Palette.NAVY_LIGHT, Palette.WHITE)
 	if _changed("heat", game.heatmap_on):
 		heat_btn.text = Strings.tf("TOGGLE", [Strings.t("HEATMAP"), Strings.t("ON")]) if game.heatmap_on else Strings.t("HEATMAP")
 		ThemeBuilder.paint(heat_btn, Palette.HEATMAP_BTN, Palette.NAVY, game.heatmap_on)
-	for info in tool_info:
-		var id = info[0]
-		var count = -1 if info[2] == "" else game.sim.inventory[info[2]]
-		var allowed = game.is_tool_allowed(id)
-		if _changed("tool%d" % id, [count, game.current_tool == id, allowed, flashes.has(id)]):
+	for h in tool_info:
+		var id = h[0]
+		var j = -1 if h[2] == "" else game.sim.inventory[h[2]]
+		var l = game.is_tool_allowed(id)
+		if _changed("tool%d" % id, [j, game.current_tool == id, l, flashes.has(id)]):
 			var b = tool_btns[id]
-			b.text = info[1] if count < 0 else Strings.tf("COUNT", [info[1], count])
-			b.disabled = not allowed
-			b.hint_tooltip = "" if allowed else Strings.t("TUT_LOCKED")
-			var bg = Palette.NAVY_LIGHT if count != 0 else Palette.NAVY_MID
-			var fg = Palette.WHITE if count != 0 else Palette.TEXT_DIM
-			if not allowed:
+			b.text = h[1] if j < 0 else Strings.tf("COUNT", [h[1], j])
+			b.disabled = not l
+			b.hint_tooltip = "" if l else Strings.t("TUT_LOCKED")
+			var bg = Palette.NAVY_LIGHT if j != 0 else Palette.NAVY_MID
+			var fg = Palette.WHITE if j != 0 else Palette.TEXT_DIM
+			if not l:
 				bg = Palette.NAVY_MID
 				fg = Palette.alpha(Palette.TEXT_DIM, 0.55)
 			if flashes.has(id):
 				bg = Palette.RED
 				fg = Palette.WHITE
-			ThemeBuilder.paint(b, bg, fg, game.current_tool == id and allowed)
+			ThemeBuilder.paint(b, bg, fg, game.current_tool == id and l)
 
 
 func _draw() -> void:
 	if game == null:
 		return
-	var sim = game.sim
+	var d = game.sim
 	draw_rect(Rect2(0, 0, SCREEN.x, TOP_H), Palette.NAVY)
 	draw_rect(Rect2(0, BAR_Y, SCREEN.x, SCREEN.y - BAR_Y), Palette.NAVY)
-	# Level name pill.
-	var f18 = Fonts.make(18, true)
-	var name_text = Strings.t(sim.level["name_key"])
-	var pill_w = f18.get_string_size(name_text).x + 36.0
-	var pill = Rect2(12, 10, pill_w, 36)
-	draw_style_box(ThemeBuilder.box(Palette.YELLOW, 18), pill)
-	DrawUtil.centered(self, f18, pill.position + pill.size / 2.0, name_text, Palette.NAVY)
-	# Deliveries.
-	var f14 = Fonts.make(14, true)
-	var bar_x = max(pill.end.x + 16.0, 230.0)
-	var bar = Rect2(bar_x, 22, 596.0 - bar_x, 22)
-	DrawUtil.left(self, Fonts.make(12, true), Vector2(bar.position.x + 2, 12), Strings.t("DELIVERED"), Palette.TEXT_DIM)
-	draw_style_box(ThemeBuilder.box(Palette.NAVY_MID, 11), bar)
-	var caption = Strings.tf("SCORE", [sim.metrics.score()])
-	if sim.goal > 0:
-		var k = clamp(float(sim.metrics.deliveries) / max(sim.goal, 1), 0.0, 1.0)
+	var e = Fonts.make(18, true)
+	var f = Strings.t(d.level["name_key"])
+	var g = e.get_string_size(f).x + 36.0
+	var h = Rect2(12, 10, g, 36)
+	draw_style_box(ThemeBuilder.box(Palette.YELLOW, 18), h)
+	DrawUtil.centered(self, e, h.position + h.size / 2.0, f, Palette.NAVY)
+	var j = Fonts.make(14, true)
+	var l = max(h.end.x + 16.0, 230.0)
+	var m = Rect2(l, 22, 596.0 - l, 22)
+	DrawUtil.left(self, Fonts.make(12, true), Vector2(m.position.x + 2, 12), Strings.t("DELIVERED"), Palette.TEXT_DIM)
+	draw_style_box(ThemeBuilder.box(Palette.NAVY_MID, 11), m)
+	var n = Strings.tf("SCORE", [d.metrics.score()])
+	if d.goal > 0:
+		var k = clamp(float(d.metrics.deliveries) / max(d.goal, 1), 0.0, 1.0)
 		if k > 0.0:
-			draw_style_box(ThemeBuilder.box(Palette.OK, 11), Rect2(bar.position, Vector2(max(bar.size.x * k, 22.0), bar.size.y)))
-		caption = Strings.tf("PROGRESS", [sim.metrics.deliveries, sim.goal])
-	elif sim.lesson:
-		caption = Strings.tf("DELIVERED_N", [sim.metrics.deliveries])
-	DrawUtil.centered(self, f14, bar.position + bar.size / 2.0, caption, Palette.WHITE)
-	# Timer.
-	var left = int(ceil(sim.time_left()))
-	var timer_pill = Rect2(606, 8, 100, 40)
-	var unlimited = sim.time_limit <= 0.0
-	var low = left <= 20 and not unlimited
-	draw_style_box(ThemeBuilder.box(Palette.NAVY_MID, 20, 2, Palette.JAM if low else Palette.NAVY_LIGHT), timer_pill)
-	var timer_text = Strings.t("NO_LIMIT") if unlimited else Strings.tf("TIMER", [left / 60, left % 60])
-	DrawUtil.centered(self, Fonts.make(24, true), timer_pill.position + timer_pill.size / 2.0,
-			timer_text, Palette.JAM if low and left % 2 == 0 else Palette.WHITE)
+			draw_style_box(ThemeBuilder.box(Palette.OK, 11), Rect2(m.position, Vector2(max(m.size.x * k, 22.0), m.size.y)))
+		n = Strings.tf("PROGRESS", [d.metrics.deliveries, d.goal])
+	elif d.lesson:
+		n = Strings.tf("DELIVERED_N", [d.metrics.deliveries])
+	DrawUtil.centered(self, j, m.position + m.size / 2.0, n, Palette.WHITE)
+	var o = int(ceil(d.time_left()))
+	var p = Rect2(606, 8, 100, 40)
+	var q = d.time_limit <= 0.0
+	var s = o <= 20 and not q
+	draw_style_box(ThemeBuilder.box(Palette.NAVY_MID, 20, 2, Palette.JAM if s else Palette.NAVY_LIGHT), p)
+	var u = Strings.t("NO_LIMIT") if q else Strings.tf("TIMER", [o / 60, o % 60])
+	DrawUtil.centered(self, Fonts.make(24, true), p.position + p.size / 2.0,
+			u, Palette.JAM if s and o % 2 == 0 else Palette.WHITE)
 
 
 func _draw_overlay() -> void:
 	if game == null:
 		return
-	# Colored dots on the tool buttons.
-	for info in tool_info:
-		var b = tool_btns[info[0]]
+	for d in tool_info:
+		var b = tool_btns[d[0]]
 		var c = b.rect_position + Vector2(20, b.rect_size.y / 2.0)
 		overlay.draw_circle(c, 8.0, Palette.NAVY)
-		overlay.draw_circle(c, 6.0, info[3])
-		if not game.is_tool_allowed(info[0]):
-			# A small padlock on the right side of a locked tool.
+		overlay.draw_circle(c, 6.0, d[3])
+		if not game.is_tool_allowed(d[0]):
 			var lc = b.rect_position + Vector2(b.rect_size.x - 22, b.rect_size.y / 2.0 + 3)
 			overlay.draw_rect(Rect2(lc + Vector2(-7, -4), Vector2(14, 11)), Palette.TEXT_DIM)
 			overlay.draw_arc(lc + Vector2(0, -4), 5.0, PI, TAU, 8, Palette.TEXT_DIM, 2.5)
-	# Heatmap legend, with patterns as well as colors.
 	if game.heatmap_on:
-		var f12 = Fonts.make(12, true)
-		var box = Rect2(1040, BAR_Y - 120, 228, 84)
-		overlay.draw_style_box(ThemeBuilder.box(Palette.alpha(Palette.NAVY, 0.92), 10), box)
-		var rows = [[Palette.OK, Strings.t("FREE"), 0], [Palette.BUSY, Strings.t("BUSY"), 1], [Palette.JAM, Strings.t("JAM_STRIPED"), 2]]
+		var e = Fonts.make(12, true)
+		var f = Rect2(1040, BAR_Y - 120, 228, 84)
+		overlay.draw_style_box(ThemeBuilder.box(Palette.alpha(Palette.NAVY, 0.92), 10), f)
+		var g = [[Palette.OK, Strings.t("FREE"), 0], [Palette.BUSY, Strings.t("BUSY"), 1], [Palette.JAM, Strings.t("JAM_STRIPED"), 2]]
 		for i in range(3):
-			var r = Rect2(box.position + Vector2(12, 10 + i * 24), Vector2(18, 18))
-			overlay.draw_rect(r, rows[i][0])
-			if rows[i][2] == 2:
+			var r = Rect2(f.position + Vector2(12, 10 + i * 24), Vector2(18, 18))
+			overlay.draw_rect(r, g[i][0])
+			if g[i][2] == 2:
 				DrawUtil.hatch(overlay, r, Palette.NAVY, 6.0, 1.5)
-			if rows[i][2] >= 1:
+			if g[i][2] >= 1:
 				overlay.draw_rect(r, Palette.NAVY, false, 1.0)
-			DrawUtil.left(overlay, f12, Vector2(r.end.x + 10, r.position.y + 9), rows[i][1], Palette.WHITE)
-	# Toast.
+			DrawUtil.left(overlay, e, Vector2(r.end.x + 10, r.position.y + 9), g[i][1], Palette.WHITE)
 	if toast_time > 0.0 and toast_text != "":
-		var f16 = Fonts.make(16, true)
-		var w = f16.get_string_size(toast_text).x + 40.0
+		var h = Fonts.make(16, true)
+		var w = h.get_string_size(toast_text).x + 40.0
 		var a = clamp(toast_time * 3.0, 0.0, 1.0)
 		var tr = Rect2((SCREEN.x - w) / 2.0, BAR_Y - 52, w, 38)
 		overlay.draw_style_box(ThemeBuilder.box(Palette.alpha(Palette.NAVY, 0.92 * a), 19, 2, Palette.alpha(Palette.YELLOW, a)), tr)
-		DrawUtil.centered(overlay, f16, tr.position + tr.size / 2.0, toast_text, Palette.alpha(Palette.WHITE, a))
+		DrawUtil.centered(overlay, h, tr.position + tr.size / 2.0, toast_text, Palette.alpha(Palette.WHITE, a))
 	if fps_on:
 		DrawUtil.left(overlay, Fonts.make(14, true), Vector2(12, TOP_H + 16),
 				Strings.tf("FPS", [int(Engine.get_frames_per_second())]), Palette.NAVY)

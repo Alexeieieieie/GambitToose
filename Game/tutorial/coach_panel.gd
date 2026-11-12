@@ -1,7 +1,5 @@
 extends Control
 
-# The instruction card of the tutorial. It shows the current step of the manager and
-# sends the player's button presses back to it. It holds no lesson logic itself.
 
 const C = preload("res://sim/constants.gd")
 const DrawUtil = preload("res://ui/draw_util.gd")
@@ -37,9 +35,9 @@ var check_y = 0.0
 var target_pos = Vector2()
 
 
-func setup(game_, manager_) -> void:
-	game = game_
-	manager = manager_
+func setup(d, e) -> void:
+	game = d
+	manager = e
 	theme = ThemeBuilder.build()
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	rect_size = Vector2(W, card_h)
@@ -73,16 +71,15 @@ func setup(game_, manager_) -> void:
 	manager.connect("lesson_completed", self, "_on_lesson_completed")
 
 
-func _button(caption: String, size: int, method: String) -> Button:
-	var b = ThemeBuilder.button(caption, Rect2(0, 0, 100, 30), size)
-	b.connect("pressed", self, method)
+func _button(d: String, e: int, g: String) -> Button:
+	var b = ThemeBuilder.button(d, Rect2(0, 0, 100, 30), e)
+	b.connect("pressed", self, g)
 	add_child(b)
 	return b
 
 
-# ------------------------------------------------------------------ manager events
 
-func _on_step_changed(_step) -> void:
+func _on_step_changed(d) -> void:
 	showing_done = false
 	if not first_step:
 		Sfx.play("tutorial_step")
@@ -93,7 +90,7 @@ func _on_step_changed(_step) -> void:
 
 func _on_lesson_completed() -> void:
 	if manager.is_final():
-		visible = false           # the game moves on to the completion screen
+		visible = false
 		return
 	showing_done = true
 	Sfx.play("lesson_complete")
@@ -108,7 +105,6 @@ func _slide_in() -> void:
 	tween.start()
 
 
-# ------------------------------------------------------------------ button handlers
 
 func _on_continue() -> void:
 	Sfx.play("ui_click", 1.0, -4.0)
@@ -141,106 +137,104 @@ func _on_skip_tutorial() -> void:
 	game.ask_skip_tutorial()
 
 
-# ------------------------------------------------------------------ layout
 
 func _key() -> String:
 	return "%s|%s|%s|%s" % [manager.idx, manager.hint_shown, showing_done, manager.checklist().size()]
 
 
 func _relayout() -> void:
-	var f16 = Fonts.make(16, false)
-	var f14 = Fonts.make(14, true)
-	var inner = W - 2 * PAD
-	var step = manager.current_step()
-	if step.empty() and not showing_done:
+	var d = Fonts.make(16, false)
+	var e = Fonts.make(14, true)
+	var g = W - 2 * PAD
+	var j = manager.current_step()
+	if j.empty() and not showing_done:
 		return
 	if manager.is_final():
 		tag_label.text = Strings.t("TUT_FINAL_TAG")
 	else:
 		tag_label.text = Strings.tf("TUT_LESSON_TAG", [manager.lesson_no, manager.lesson_count])
 	title_label.text = Strings.t(manager.lesson["title_key"])
-	var body = ""
-	var hint = ""
+	var k = ""
+	var m = ""
 	if showing_done:
 		title_label.text = Strings.t("TUT_LESSON_DONE")
-		body = Strings.t("TUT_LESSON_DONE_BODY")
+		k = Strings.t("TUT_LESSON_DONE_BODY")
 	else:
-		body = Strings.t(step["text_key"])
-		if manager.hint_shown and step.has("hint_key"):
-			hint = Strings.t(step["hint_key"])
-	text_label.text = body
-	var text_h = DrawUtil.wrap_lines(f16, body, inner) * (f16.get_height() + 3)
+		k = Strings.t(j["text_key"])
+		if manager.hint_shown and j.has("hint_key"):
+			m = Strings.t(j["hint_key"])
+	text_label.text = k
+	var o = DrawUtil.wrap_lines(d, k, g) * (d.get_height() + 3)
 	text_label.rect_position = Vector2(PAD, 62)
-	text_label.rect_size = Vector2(inner, text_h)
-	var y = 62.0 + text_h + 6.0
-	hint_label.text = hint
-	hint_label.visible = hint != ""
-	if hint != "":
-		var hh = DrawUtil.wrap_lines(f14, hint, inner) * (f14.get_height() + 3)
+	text_label.rect_size = Vector2(g, o)
+	var y = 62.0 + o + 6.0
+	hint_label.text = m
+	hint_label.visible = m != ""
+	if m != "":
+		var hh = DrawUtil.wrap_lines(e, m, g) * (e.get_height() + 3)
 		hint_label.rect_position = Vector2(PAD, y)
-		hint_label.rect_size = Vector2(inner, hh)
+		hint_label.rect_size = Vector2(g, hh)
 		y += hh + 6.0
 	check_y = y
 	if not showing_done and manager.checklist().size() > 0:
 		y += 26.0
-	continue_btn.text = Strings.t(step.get("button_key", "TUT_CONTINUE")) if not showing_done else ""
+	continue_btn.text = Strings.t(j.get("button_key", "TUT_CONTINUE")) if not showing_done else ""
 	card_h = y + 46.0
 	rect_size = Vector2(W, card_h)
 	layout_key = _key()
 
 
-func _text_w(b: Button, size: int) -> float:
-	return Fonts.make(size, true).get_string_size(b.text).x
+func _text_w(b: Button, d: int) -> float:
+	return Fonts.make(d, true).get_string_size(b.text).x
 
 
 func _place() -> void:
-	var avoid = []
+	var d = []
 	var h = manager.highlights()
-	for cell in h["cells"]:
-		avoid.append(Rect2(MAP_ORIGIN + cell * C.TILE, Vector2(C.TILE, C.TILE)).grow(12.0))
-	for key in h["ui"]:
-		var r = UiRegistry.get_rect(key)
+	for e in h["cells"]:
+		d.append(Rect2(MAP_ORIGIN + e * C.TILE, Vector2(C.TILE, C.TILE)).grow(12.0))
+	for g in h["ui"]:
+		var r = UiRegistry.get_rect(g)
 		if r.size.x > 0.0:
-			avoid.append(r.grow(10.0))
-	var bottom = BOTTOM_Y - card_h
-	var cands = [Vector2(380, TOP_Y), Vector2(380, bottom), Vector2(16, TOP_Y), Vector2(16, bottom),
-			Vector2(744, TOP_Y), Vector2(744, bottom)]
+			d.append(r.grow(10.0))
+	var j = BOTTOM_Y - card_h
+	var k = [Vector2(380, TOP_Y), Vector2(380, j), Vector2(16, TOP_Y), Vector2(16, j),
+			Vector2(744, TOP_Y), Vector2(744, j)]
 	if game.modal:
-		cands = [Vector2(16, TOP_Y), Vector2(16, bottom)]
-	var best = cands[0]
-	var best_area = 1e12
-	for c in cands:
-		var rect = Rect2(c, Vector2(W, card_h))
-		var area = 0.0
-		for a in avoid:
-			var inter = rect.clip(a)
-			area += inter.size.x * inter.size.y
-		if area < best_area - 0.5:
-			best_area = area
-			best = c
-		if area == 0.0:
+		k = [Vector2(16, TOP_Y), Vector2(16, j)]
+	var m = k[0]
+	var o = 1e12
+	for c in k:
+		var p = Rect2(c, Vector2(W, card_h))
+		var q = 0.0
+		for a in d:
+			var s = p.clip(a)
+			q += s.size.x * s.size.y
+		if q < o - 0.5:
+			o = q
+			m = c
+		if q == 0.0:
 			break
-	target_pos = best
+	target_pos = m
 
 
-func _process(_delta: float) -> void:
+func _process(d: float) -> void:
 	if manager == null or (manager.done and not showing_done):
-		return                    # nothing left to show (the final test ended)
+		return
 	if _key() != layout_key:
 		_relayout()
 	_place()
 	rect_position = rect_position.linear_interpolate(target_pos + Vector2(0, slide), 0.35) \
 			if abs(rect_position.x - target_pos.x) < 400.0 and rect_position.y > 0.0 else target_pos + Vector2(0, slide)
-	var info = manager.is_info_step()
-	dim.visible = info and not showing_done and not game.modal
+	var e = manager.is_info_step()
+	dim.visible = e and not showing_done and not game.modal
 	dim.rect_position = Vector2(0, MAP_ORIGIN.y) - rect_position
 	dim.rect_size = Vector2(SCREEN.x, 600)
-	continue_btn.visible = info and not showing_done
+	continue_btn.visible = e and not showing_done
 	next_btn.visible = showing_done
 	hint_btn.visible = not showing_done and manager.hint_available() and not manager.hint_shown
 	skip_step_btn.visible = not showing_done and manager.skip_available()
 	reset_btn.visible = manager.broken and not showing_done
-	# Footer: the skip link at the left, action buttons from the right edge.
 	var fy = card_h - 40.0
 	skip_tut_btn.rect_position = Vector2(PAD - 8, fy + 4)
 	skip_tut_btn.rect_size = Vector2(_text_w(skip_tut_btn, 13) + 36.0, 28)
@@ -266,28 +260,27 @@ func _draw() -> void:
 		return
 	draw_style_box(ThemeBuilder.box(Palette.alpha(Palette.NAVY, 0.97), 18, 3, Palette.alpha(Palette.YELLOW, 0.9)),
 			Rect2(Vector2(), Vector2(W, card_h)))
-	# Progress dots: one per step of this lesson.
 	var n = manager.steps.size()
 	for i in range(n):
 		var c = Vector2(W - PAD - (n - 1 - i) * 14.0 - 4.0, 21)
-		var filled = i < manager.idx or showing_done
+		var d = i < manager.idx or showing_done
 		if i == manager.idx and not showing_done:
 			draw_circle(c, 5.0, Palette.YELLOW)
-		elif filled:
+		elif d:
 			draw_circle(c, 4.0, Palette.OK)
 		else:
 			draw_circle(c, 4.0, Palette.NAVY_LIGHT)
 	if showing_done:
 		return
-	var list = manager.checklist()
+	var e = manager.checklist()
 	var x = PAD
-	for item in list:
-		var box = Rect2(x, check_y + 2, 18, 18)
-		draw_style_box(ThemeBuilder.box(Palette.OK if item[1] else Palette.NAVY_MID, 4, 2, Palette.YELLOW), box)
-		if item[1]:
-			draw_line(box.position + Vector2(4, 9), box.position + Vector2(8, 13), Palette.NAVY, 2.5)
-			draw_line(box.position + Vector2(8, 13), box.position + Vector2(14, 5), Palette.NAVY, 2.5)
-		var label = Strings.t(item[0])
+	for g in e:
+		var j = Rect2(x, check_y + 2, 18, 18)
+		draw_style_box(ThemeBuilder.box(Palette.OK if g[1] else Palette.NAVY_MID, 4, 2, Palette.YELLOW), j)
+		if g[1]:
+			draw_line(j.position + Vector2(4, 9), j.position + Vector2(8, 13), Palette.NAVY, 2.5)
+			draw_line(j.position + Vector2(8, 13), j.position + Vector2(14, 5), Palette.NAVY, 2.5)
+		var k = Strings.t(g[0])
 		var f = Fonts.make(14, true)
-		DrawUtil.left(self, f, Vector2(x + 26, check_y + 11), label, Palette.WHITE)
-		x += 26 + f.get_string_size(label).x + 24
+		DrawUtil.left(self, f, Vector2(x + 26, check_y + 11), k, Palette.WHITE)
+		x += 26 + f.get_string_size(k).x + 24

@@ -1,6 +1,5 @@
 extends Node
 
-# First scene of the game: sends a fresh install to the Welcome screen and everyone else to the menu.
 
 
 func _ready() -> void:

@@ -1,6 +1,5 @@
 extends Control
 
-# Modal panel that programs one traffic light.
 
 signal applied(cell, mode, period, threshold, urgent_first)
 signal closed
@@ -27,7 +26,7 @@ var period_label
 var period_slider
 var urgent_btn
 var preview
-var demo                         # a private light that only drives the preview
+var demo
 var demo_clock = 0.0
 
 
@@ -35,11 +34,11 @@ func _ready() -> void:
 	rect_size = SCREEN
 	theme = ThemeBuilder.build()
 	visible = false
-	var dim = ColorRect.new()
-	dim.color = Palette.alpha(Palette.NAVY, 0.65)
-	dim.rect_size = SCREEN
-	dim.mouse_filter = Control.MOUSE_FILTER_STOP
-	add_child(dim)
+	var d = ColorRect.new()
+	d.color = Palette.alpha(Palette.NAVY, 0.65)
+	d.rect_size = SCREEN
+	d.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(d)
 	card = Panel.new()
 	card.rect_position = CARD.position
 	card.rect_size = CARD.size
@@ -50,20 +49,20 @@ func _ready() -> void:
 	sub_label = ThemeBuilder.label(Strings.t("LIGHT_PANEL_SUB"), Rect2(24, 40, 572, 22), 14, false, Palette.TEXT_DIM)
 	card.add_child(sub_label)
 
-	var modes = [[C.LightMode.TIMER, Strings.t("MODE_TIMER"), Strings.t("MODE_TIMER_DESC"), "light_mode_timer"],
+	var e = [[C.LightMode.TIMER, Strings.t("MODE_TIMER"), Strings.t("MODE_TIMER_DESC"), "light_mode_timer"],
 			[C.LightMode.SENSOR, Strings.t("MODE_SENSOR"), Strings.t("MODE_SENSOR_DESC"), "light_mode_sensor"],
 			[C.LightMode.PRIORITY, Strings.t("MODE_PRIORITY"), Strings.t("MODE_PRIORITY_DESC"), "light_mode_priority"]]
 	var x = 24.0
-	for m in modes:
+	for m in e:
 		var b = ThemeBuilder.button(m[1], Rect2(x, 66, 182, 52), 18)
 		Sfx.hover_hook(b)
 		b.connect("pressed", self, "_on_mode", [m[0]])
 		card.add_child(b)
 		mode_btns[m[0]] = b
 		UiRegistry.register(m[3], b)
-		var note = ThemeBuilder.label(m[2], Rect2(x, 120, 182, 40), 12, false, Palette.TEXT_DIM, true)
-		card.add_child(note)
-		mode_notes[m[0]] = note
+		var f = ThemeBuilder.label(m[2], Rect2(x, 120, 182, 40), 12, false, Palette.TEXT_DIM, true)
+		card.add_child(f)
+		mode_notes[m[0]] = f
 		x += 195.0
 
 	threshold_label = ThemeBuilder.label("", Rect2(24, 176, 300, 26), 16, true)
@@ -82,8 +81,8 @@ func _ready() -> void:
 	urgent_btn.connect("pressed", self, "_on_urgent")
 	card.add_child(urgent_btn)
 
-	var preview_title = ThemeBuilder.label(Strings.t("PREVIEW"), Rect2(350, 172, 246, 22), 12, true, Palette.TEXT_DIM, true)
-	card.add_child(preview_title)
+	var g = ThemeBuilder.label(Strings.t("PREVIEW"), Rect2(350, 172, 246, 22), 12, true, Palette.TEXT_DIM, true)
+	card.add_child(g)
 	preview = Control.new()
 	preview.rect_position = Vector2(350, 196)
 	preview.rect_size = Vector2(246, 112)
@@ -91,16 +90,16 @@ func _ready() -> void:
 	preview.connect("draw", self, "_draw_preview")
 	card.add_child(preview)
 
-	var cancel = ThemeBuilder.button(Strings.t("CANCEL"), Rect2(24, 448, 270, 52), 18)
-	Sfx.hover_hook(cancel)
-	cancel.connect("pressed", self, "_on_cancel")
-	card.add_child(cancel)
-	var apply = ThemeBuilder.button(Strings.t("APPLY"), Rect2(326, 448, 270, 52), 18)
-	Sfx.hover_hook(apply)
-	ThemeBuilder.paint(apply, Palette.YELLOW, Palette.NAVY)
-	apply.connect("pressed", self, "_on_apply")
-	card.add_child(apply)
-	UiRegistry.register("light_apply", apply)
+	var h = ThemeBuilder.button(Strings.t("CANCEL"), Rect2(24, 448, 270, 52), 18)
+	Sfx.hover_hook(h)
+	h.connect("pressed", self, "_on_cancel")
+	card.add_child(h)
+	var j = ThemeBuilder.button(Strings.t("APPLY"), Rect2(326, 448, 270, 52), 18)
+	Sfx.hover_hook(j)
+	ThemeBuilder.paint(j, Palette.YELLOW, Palette.NAVY)
+	j.connect("pressed", self, "_on_apply")
+	card.add_child(j)
+	UiRegistry.register("light_apply", j)
 
 
 func _slider(r: Rect2, lo: float, hi: float) -> HSlider:
@@ -115,17 +114,16 @@ func _slider(r: Rect2, lo: float, hi: float) -> HSlider:
 
 
 func move_to_right() -> void:
-	# In the tutorial the coach card sits on the left, so the panel moves right.
 	card.rect_position = Vector2(SCREEN.x - CARD.size.x - 10.0, CARD.position.y)
 
 
-func open(light, cell_label: String) -> void:
-	cell = light.cell
-	chosen_mode = light.mode
-	chosen_urgent = light.urgent_first
-	threshold_slider.value = light.threshold
-	period_slider.value = light.period
-	title.text = Strings.tf("LIGHT_TITLE", [cell_label])
+func open(d, e: String) -> void:
+	cell = d.cell
+	chosen_mode = d.mode
+	chosen_urgent = d.urgent_first
+	threshold_slider.value = d.threshold
+	period_slider.value = d.period
+	title.text = Strings.tf("LIGHT_TITLE", [e])
 	demo = Intersection.new()
 	_sync()
 	visible = true
@@ -137,16 +135,16 @@ func _sync() -> void:
 		ThemeBuilder.paint(mode_btns[m], Palette.NAVY_LIGHT if on else Palette.NAVY, Palette.WHITE, on)
 	threshold_label.text = Strings.tf("THRESHOLD", [int(threshold_slider.value)])
 	period_label.text = Strings.tf("PERIOD", [int(period_slider.value)])
-	var timer_mode = chosen_mode == C.LightMode.TIMER
-	threshold_slider.editable = not timer_mode
-	period_slider.editable = timer_mode
-	threshold_label.modulate.a = 0.4 if timer_mode else 1.0
-	threshold_slider.modulate.a = 0.4 if timer_mode else 1.0
-	period_label.modulate.a = 1.0 if timer_mode else 0.4
-	period_slider.modulate.a = 1.0 if timer_mode else 0.4
-	var urgent_on = chosen_urgent or chosen_mode == C.LightMode.PRIORITY
-	urgent_btn.text = Strings.tf("TOGGLE", [Strings.t("URGENT_FIRST"), Strings.t("ON") if urgent_on else Strings.t("OFF")])
-	ThemeBuilder.paint(urgent_btn, Palette.NAVY_LIGHT if urgent_on else Palette.NAVY, Palette.WHITE, urgent_on)
+	var d = chosen_mode == C.LightMode.TIMER
+	threshold_slider.editable = not d
+	period_slider.editable = d
+	threshold_label.modulate.a = 0.4 if d else 1.0
+	threshold_slider.modulate.a = 0.4 if d else 1.0
+	period_label.modulate.a = 1.0 if d else 0.4
+	period_slider.modulate.a = 1.0 if d else 0.4
+	var e = chosen_urgent or chosen_mode == C.LightMode.PRIORITY
+	urgent_btn.text = Strings.tf("TOGGLE", [Strings.t("URGENT_FIRST"), Strings.t("ON") if e else Strings.t("OFF")])
+	ThemeBuilder.paint(urgent_btn, Palette.NAVY_LIGHT if e else Palette.NAVY, Palette.WHITE, e)
 	urgent_btn.disabled = chosen_mode == C.LightMode.PRIORITY
 	if demo != null:
 		demo.mode = chosen_mode
@@ -161,7 +159,7 @@ func _on_mode(m) -> void:
 	_sync()
 
 
-func _on_slider(_value) -> void:
+func _on_slider(d) -> void:
 	_sync()
 
 
@@ -184,51 +182,49 @@ func _on_cancel() -> void:
 	emit_signal("closed")
 
 
-func _process(delta: float) -> void:
+func _process(d: float) -> void:
 	if not visible or demo == null:
 		return
-	# The preview runs a private light with a made-up queue that grows on the red road.
-	demo_clock += delta
-	var other = 1 - demo.green_axis
+	demo_clock += d
+	var e = 1 - demo.green_axis
 	demo.waiting[demo.green_axis] = 0 if demo.t > 1.5 else 2
-	demo.waiting[other] = int(min(demo.t * 1.5, 9.0))
-	demo.urgent_waiting[other] = fmod(demo_clock, 9.0) > 7.0
+	demo.waiting[e] = int(min(demo.t * 1.5, 9.0))
+	demo.urgent_waiting[e] = fmod(demo_clock, 9.0) > 7.0
 	demo.urgent_waiting[demo.green_axis] = false
-	demo.tick(delta)
+	demo.tick(d)
 	preview.update()
 
 
 func _draw_preview() -> void:
-	var size = preview.rect_size
-	var c = size / 2.0
-	preview.draw_style_box(ThemeBuilder.box(Palette.GRASS, 10), Rect2(Vector2(), size))
-	preview.draw_rect(Rect2(0, c.y - 13, size.x, 26), Palette.ASPHALT)
-	preview.draw_rect(Rect2(c.x - 13, 0, 26, size.y), Palette.ASPHALT)
+	var d = preview.rect_size
+	var c = d / 2.0
+	preview.draw_style_box(ThemeBuilder.box(Palette.GRASS, 10), Rect2(Vector2(), d))
+	preview.draw_rect(Rect2(0, c.y - 13, d.x, 26), Palette.ASPHALT)
+	preview.draw_rect(Rect2(c.x - 13, 0, 26, d.y), Palette.ASPHALT)
 	if demo == null:
 		return
-	var cols = []
-	for axis in [0, 1]:
-		var col = Palette.JAM
-		if demo.green_axis == axis:
-			col = Palette.OK if demo.phase == Intersection.Phase.GREEN else Palette.BUSY
+	var e = []
+	for f in [0, 1]:
+		var g = Palette.JAM
+		if demo.green_axis == f:
+			g = Palette.OK if demo.phase == Intersection.Phase.GREEN else Palette.BUSY
 			if demo.phase == Intersection.Phase.ALL_RED:
-				col = Palette.JAM
-		cols.append(col)
-	preview.draw_line(c + Vector2(-16, -13), c + Vector2(-16, 13), cols[0], 4.0)
-	preview.draw_line(c + Vector2(16, -13), c + Vector2(16, 13), cols[0], 4.0)
-	preview.draw_line(c + Vector2(-13, -16), c + Vector2(13, -16), cols[1], 4.0)
-	preview.draw_line(c + Vector2(-13, 16), c + Vector2(13, 16), cols[1], 4.0)
-	# Queues: little trucks waiting on each road.
+				g = Palette.JAM
+		e.append(g)
+	preview.draw_line(c + Vector2(-16, -13), c + Vector2(-16, 13), e[0], 4.0)
+	preview.draw_line(c + Vector2(16, -13), c + Vector2(16, 13), e[0], 4.0)
+	preview.draw_line(c + Vector2(-13, -16), c + Vector2(13, -16), e[1], 4.0)
+	preview.draw_line(c + Vector2(-13, 16), c + Vector2(13, 16), e[1], 4.0)
 	for i in range(int(min(demo.waiting[0], 6))):
 		preview.draw_rect(Rect2(c.x - 36 - i * 17, c.y + 2, 13, 8), Palette.BLUE)
 	for i in range(int(min(demo.waiting[1], 3))):
 		preview.draw_rect(Rect2(c.x - 10, c.y - 36 - i * 13, 8, 11), Palette.RED)
-	var urgent_axis = -1
+	var h = -1
 	if demo.urgent_waiting[0]:
-		urgent_axis = 0
+		h = 0
 	elif demo.urgent_waiting[1]:
-		urgent_axis = 1
-	if urgent_axis == 0:
+		h = 1
+	if h == 0:
 		DrawUtil.dashed_circle(preview, Vector2(c.x - 30, c.y + 6), 11.0, Palette.URGENT_RING, 2.0, 6, demo_clock * 3.0)
-	elif urgent_axis == 1:
+	elif h == 1:
 		DrawUtil.dashed_circle(preview, Vector2(c.x - 6, c.y - 31), 11.0, Palette.URGENT_RING, 2.0, 6, demo_clock * 3.0)
